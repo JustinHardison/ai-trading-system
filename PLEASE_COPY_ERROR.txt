@@ -1,0 +1,24 @@
+═══════════════════════════════════════════════════════════
+I CANNOT SEE YOUR SCREEN!
+═══════════════════════════════════════════════════════════
+
+I need you to do this RIGHT NOW:
+
+1. Look at MT5
+2. Click the "Experts" tab at the bottom
+3. Find the RED ERROR TEXT
+4. RIGHT-CLICK on the error
+5. Select "Copy"
+6. PASTE IT HERE
+
+Example of what I need to see:
+- "cannot convert 'null' to number"
+- "field 'lot_size' not found in response"
+- "HTTP request failed"
+- "variable 'momentum' not declared"
+- etc.
+
+WITHOUT THE EXACT ERROR TEXT, I'M JUST GUESSING!
+
+Please copy/paste the error message NOW!
+

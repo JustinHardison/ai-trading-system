@@ -1,0 +1,143 @@
+.ai-activity-log {
+  background: #1a1a2e;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.ai-activity-log h3 {
+  color: #00d4ff;
+  margin-bottom: 15px;
+  font-size: 1.2em;
+  border-bottom: 2px solid #00d4ff;
+  padding-bottom: 10px;
+}
+
+.no-activities {
+  color: #888;
+  text-align: center;
+  padding: 30px;
+  font-style: italic;
+}
+
+.activity-list {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid #555;
+  transition: all 0.3s ease;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.activity-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateX(5px);
+}
+
+.activity-icon {
+  font-size: 1.5em;
+  min-width: 30px;
+  text-align: center;
+}
+
+.activity-time {
+  color: #888;
+  font-size: 0.85em;
+  min-width: 80px;
+  font-family: 'Courier New', monospace;
+}
+
+.activity-message {
+  flex: 1;
+  color: #e0e0e0;
+  line-height: 1.4;
+}
+
+/* Activity type-specific styles */
+.activity-ml {
+  border-left-color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.activity-llm {
+  border-left-color: #4ecdc4;
+  background: rgba(78, 205, 196, 0.1);
+}
+
+.activity-trade {
+  border-left-color: #45b7d1;
+  background: rgba(69, 183, 209, 0.1);
+}
+
+.activity-error {
+  border-left-color: #ff4757;
+  background: rgba(255, 71, 87, 0.15);
+}
+
+.activity-info {
+  border-left-color: #95a5a6;
+  background: rgba(149, 165, 166, 0.05);
+}
+
+/* Scrollbar styling */
+.activity-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.activity-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.activity-list::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+.activity-list::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .activity-time {
+    display: none;
+  }
+
+  .activity-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .activity-icon {
+    font-size: 1.2em;
+  }
+
+  .activity-message {
+    font-size: 0.9em;
+  }
+}

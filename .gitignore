@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Cache
+cache/
+.cache/
+
+# Models (too large for git)
+models/*.pkl
+models/*.joblib
+models/*.h5
+models/*.pt
+
+# Data files
+data/*.csv
+data/*.json
+data/*.parquet
+
+# Trading system specific
+trading-system.tar.gz
+*.pid
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Credentials
+*.key
+*.pem
+*.key.pub
+.oci/
+
+# Temporary files
+/tmp/
+*.tmp
+*.bak
+*.backup
+
+# Oracle specific
+create_arm_instance.json
+/Users/justinhardison/
+backups/
+*.pkl
+catboost_info/
+ml_api_integrated.py*

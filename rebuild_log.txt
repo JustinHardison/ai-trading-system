@@ -1,0 +1,216 @@
+[2025-11-22 11:16:40] ================================================================================
+[2025-11-22 11:16:40] AUTONOMOUS HEDGE FUND SYSTEM REBUILD
+[2025-11-22 11:16:40] ================================================================================
+[2025-11-22 11:16:40] Started: 2025-11-22 11:16:40.926218
+[2025-11-22 11:16:40] Base directory: /Users/justinhardison/ai-trading-system
+[2025-11-22 11:16:40] ================================================================================
+[2025-11-22 11:16:40] 
+################################################################################
+[2025-11-22 11:16:40] STARTING: Phase 1: Backup
+[2025-11-22 11:16:40] ################################################################################
+[2025-11-22 11:16:40] 
+================================================================================
+[2025-11-22 11:16:40] PHASE 1: BACKUP CURRENT SYSTEM
+[2025-11-22 11:16:40] ================================================================================
+[2025-11-22 11:16:41] ✅ Backed up models to /Users/justinhardison/ai-trading-system/backups/pre_rebuild_20251122_111640/models
+[2025-11-22 11:16:41] ✅ Backed up api.py
+[2025-11-22 11:16:41] ✅ Phase 1 complete: Backup created
+[2025-11-22 11:16:41] 
+################################################################################
+[2025-11-22 11:16:41] STARTING: Phase 2: Cleanup
+[2025-11-22 11:16:41] ################################################################################
+[2025-11-22 11:16:41] 
+================================================================================
+[2025-11-22 11:16:41] PHASE 2: CLEANUP OLD MODELS
+[2025-11-22 11:16:41] ================================================================================
+[2025-11-22 11:16:41] Found 79 total models
+[2025-11-22 11:16:41] 🗑️  DELETE: usdjpy_rf_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_ensemble_20251112_200757.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_tick_exit_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_rl_20251112_200757.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_tick_exit_20251107_100235.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: xau_rf_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_scalping_20251106_223701.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_exit_scalping_20251106_223701.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: commodities_ensemble_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_gb_model.pkl
+[2025-11-22 11:16:41] ✅ KEEP: usoil_ensemble_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_optimized_20251106_095815.pkl
+[2025-11-22 11:16:41] ✅ KEEP: gbpusd_ensemble_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_scalping_20251106_225005.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_exit_scalping_20251106_225005.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: rl_agent_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_rf_model.pkl
+[2025-11-22 11:16:41] ✅ KEEP: eurusd_ensemble_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_ensemble_h1_20251112_234719.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_rl_20251107_103213.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_ensemble_h1_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_ensemble_20251107_103213.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_ensemble_h1_20251112_235758.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: usdjpy_gb_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: indices_ensemble_latest.pkl
+[2025-11-22 11:16:41] ✅ KEEP: xau_ensemble_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_tick_entry_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_optimized_latest_backup.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: xau_gb_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_rl_h1_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: gbpusd_rf_model.pkl
+[2025-11-22 11:16:41] ✅ KEEP: usdjpy_ensemble_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_ensemble_20251118_130030.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_scalping_20251106_222705.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_exit_model_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: multi_action_q_table.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: forex_ensemble_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_exit_scalping_20251106_222705.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_rl_20251118_130030.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_h1h4_only_20251106_101427.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us100_gb_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_rl_20251112_205647.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_ensemble_20251112_205647.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: rl_agent_20251107_101432.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: eurusd_ensemble_latest_biased_backup.pkl
+[2025-11-22 11:16:41] ✅ KEEP: us500_ensemble_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us500_rf_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: usoil_rf_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_ensemble_v2.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: rf_model_20251102_203334.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_optimized_20251105_103227.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_optimized_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: eurusd_gb_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: rf_model_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_rl_h1_20251112_234719.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_rl_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us500_gb_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: usoil_gb_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_rl_h1_20251112_235758.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_optimized_20251105_093718.pkl
+[2025-11-22 11:16:41] ✅ KEEP: us30_ensemble_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_ensemble.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: eurusd_rf_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: gbpusd_gb_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_ensemble_20251112_204728.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_exit_model_20251105_110634.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_rl_20251111_143359.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_rl_20251112_204728.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_optimized_20251105_094649.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: xau_ensemble_latest_biased_backup.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_rl_agent.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_ensemble_20251111_143359.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: xgboost_enhanced_m1.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us30_tick_entry_20251107_100235.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: us100_rf_model.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: pro_ensemble_20251107_101432.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_ensemble_20251111_135144.pkl
+[2025-11-22 11:16:41] ✅ KEEP: us100_ensemble_latest.pkl
+[2025-11-22 11:16:41] 🗑️  DELETE: integrated_rl_20251111_135144.pkl
+[2025-11-22 11:16:41] 
+✅ Phase 2 complete: Kept 8 models, deleted 71 models
+[2025-11-22 11:16:41] 
+################################################################################
+[2025-11-22 11:16:41] STARTING: Phase 3: Verify Data
+[2025-11-22 11:16:41] ################################################################################
+[2025-11-22 11:16:41] 
+================================================================================
+[2025-11-22 11:16:41] PHASE 3: VERIFY TRAINING DATA
+[2025-11-22 11:16:41] ================================================================================
+[2025-11-22 11:16:41] ⚠️  No training data found
+[2025-11-22 11:16:41] 📋 INSTRUCTIONS:
+[2025-11-22 11:16:41]    1. Open MetaTrader 5
+[2025-11-22 11:16:41]    2. Open chart for each symbol:
+[2025-11-22 11:16:41]       - US30
+[2025-11-22 11:16:41]       - US100
+[2025-11-22 11:16:41]       - US500
+[2025-11-22 11:16:41]       - EURUSD
+[2025-11-22 11:16:41]       - GBPUSD
+[2025-11-22 11:16:41]       - USDJPY
+[2025-11-22 11:16:41]       - XAU
+[2025-11-22 11:16:41]       - USOIL
+[2025-11-22 11:16:41]    3. Drag 'Export_Ultimate_Training_Data.mq5' onto each chart
+[2025-11-22 11:16:41]    4. Wait for export to complete
+[2025-11-22 11:16:41]    5. Copy CSV files from MT5/Files/ to:
+[2025-11-22 11:16:41]       /Users/justinhardison/ai-trading-system/data/
+[2025-11-22 11:16:41] 
+⏸️  Waiting for data files...
+[2025-11-22 11:16:51]    Still waiting for data files...
+[2025-11-22 11:17:01]    Still waiting for data files...
+[2025-11-22 11:17:11]    Still waiting for data files...
+[2025-11-22 11:17:21]    Still waiting for data files...
+[2025-11-22 11:17:32]    Still waiting for data files...
+[2025-11-22 11:17:42]    Still waiting for data files...
+[2025-11-22 11:17:52]    Still waiting for data files...
+[2025-11-22 11:18:02]    Still waiting for data files...
+[2025-11-22 11:18:12]    Still waiting for data files...
+[2025-11-22 11:18:22]    Still waiting for data files...
+[2025-11-22 11:18:32]    Still waiting for data files...
+[2025-11-22 11:18:42]    Still waiting for data files...
+[2025-11-22 11:18:52]    Still waiting for data files...
+[2025-11-22 11:19:02]    Still waiting for data files...
+[2025-11-22 11:19:12]    Still waiting for data files...
+[2025-11-22 11:19:22]    Still waiting for data files...
+[2025-11-22 11:19:32]    Still waiting for data files...
+[2025-11-22 11:19:42]    Still waiting for data files...
+[2025-11-22 11:19:52]    Still waiting for data files...
+[2025-11-22 11:20:02]    Still waiting for data files...
+[2025-11-22 11:20:12]    Still waiting for data files...
+[2025-11-22 11:20:22]    Still waiting for data files...
+[2025-11-22 11:20:32]    Still waiting for data files...
+[2025-11-22 11:20:42]    Still waiting for data files...
+[2025-11-22 11:20:52]    Still waiting for data files...
+[2025-11-22 11:21:02]    Still waiting for data files...
+[2025-11-22 11:21:12]    Still waiting for data files...
+[2025-11-22 11:21:22]    Still waiting for data files...
+[2025-11-22 11:21:32]    Still waiting for data files...
+[2025-11-22 11:21:42]    Still waiting for data files...
+[2025-11-22 11:21:52]    Still waiting for data files...
+[2025-11-22 11:22:02]    Still waiting for data files...
+[2025-11-22 11:22:12]    Still waiting for data files...
+[2025-11-22 11:22:22]    Still waiting for data files...
+[2025-11-22 11:22:32]    Still waiting for data files...
+[2025-11-22 11:22:42]    Still waiting for data files...
+[2025-11-22 11:22:52]    Still waiting for data files...
+[2025-11-22 11:23:02]    Still waiting for data files...
+[2025-11-22 11:23:12]    Still waiting for data files...
+[2025-11-22 11:23:22]    Still waiting for data files...
+[2025-11-22 11:23:32]    Still waiting for data files...
+[2025-11-22 11:23:42]    Still waiting for data files...
+[2025-11-22 11:23:52]    Still waiting for data files...
+[2025-11-22 11:24:02]    Still waiting for data files...
+[2025-11-22 11:24:12]    Still waiting for data files...
+[2025-11-22 11:24:22]    Still waiting for data files...
+[2025-11-22 11:24:32]    Still waiting for data files...
+[2025-11-22 11:24:42]    Still waiting for data files...
+[2025-11-22 11:24:52]    Still waiting for data files...
+[2025-11-22 11:25:02]    Still waiting for data files...
+[2025-11-22 11:25:12]    Still waiting for data files...
+[2025-11-22 11:25:12] 
+✅ Found 9 data files:
+[2025-11-22 11:25:12]    - US30_H4_data.csv (0.0 MB)
+[2025-11-22 11:25:12]    - US30_M1_data.csv (6.1 MB)
+[2025-11-22 11:25:12]    - ftmo_pro_ai_trades.csv (0.0 MB)
+[2025-11-22 11:25:12]    - US30_D1_data.csv (0.0 MB)
+[2025-11-22 11:25:12]    - US30_M30_data.csv (0.3 MB)
+[2025-11-22 11:25:12]    - US30_M15_data.csv (0.6 MB)
+[2025-11-22 11:25:12]    - ultimate_training_data.csv (35.9 MB)
+[2025-11-22 11:25:12]    - US30_H1_data.csv (0.2 MB)
+[2025-11-22 11:25:12]    - US30_M5_data.csv (1.8 MB)
+[2025-11-22 11:25:12] ✅ Phase 3 complete: Training data verified
+[2025-11-22 11:25:12] 
+################################################################################
+[2025-11-22 11:25:12] STARTING: Phase 4: Train Models
+[2025-11-22 11:25:12] ################################################################################
+[2025-11-22 11:25:12] 
+================================================================================
+[2025-11-22 11:25:12] PHASE 4: TRAIN ML MODELS
+[2025-11-22 11:25:12] ================================================================================
+[2025-11-22 11:25:12] 
+================================================================================
+[2025-11-22 11:25:12] EXECUTING: Train all ML models (LightGBM + CatBoost + LSTM)
+[2025-11-22 11:25:12] Command: cd /Users/justinhardison/ai-trading-system && python3 /Users/justinhardison/ai-trading-system/train_ultimate_models.py
+[2025-11-22 11:25:12] ================================================================================
+[2025-11-22 11:51:56] STDERR:
+[mutex.cc : 452] RAW: Lock blocking 0x10eee5c78   @
+
+[2025-11-22 11:51:56] ❌ FAILED: Train all ML models (LightGBM + CatBoost + LSTM) (exit code: -15)
+[2025-11-22 11:51:56] ❌ Phase 4 failed: ML training error
+[2025-11-22 11:51:56] 
+❌ REBUILD FAILED AT: Phase 4: Train Models

@@ -1,0 +1,407 @@
+.ai-analysis-card {
+  background: #1e1e2e;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #2a2a3e;
+}
+
+.card-header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.analysis-badge {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.analysis-badge.active {
+  background: #10b981;
+  color: #fff;
+}
+
+.analysis-badge.scanning {
+  background: #3b82f6;
+  color: #fff;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.analysis-badge.waiting {
+  background: #6b7280;
+  color: #fff;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.analysis-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #9ca3af;
+}
+
+.analysis-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.analysis-section {
+  background: #252535;
+  border-radius: 8px;
+  padding: 16px;
+  border-left: 4px solid #3b82f6;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.section-icon {
+  font-size: 1.4rem;
+}
+
+.section-header h4 {
+  margin: 0;
+  color: #e5e7eb;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* Market Regime */
+.regime-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.regime-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.regime-badge {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+}
+
+.regime-badge.trending {
+  background: #10b981;
+  color: #fff;
+}
+
+.regime-badge.ranging {
+  background: #f59e0b;
+  color: #000;
+}
+
+.regime-badge.volatile {
+  background: #ef4444;
+  color: #fff;
+}
+
+.regime-badge.unknown {
+  background: #6b7280;
+  color: #fff;
+}
+
+.regime-strength {
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.regime-description {
+  color: #d1d5db;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Signals */
+.signals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.signal-item {
+  background: #1a1a28;
+  border-radius: 6px;
+  padding: 12px;
+  border-left: 3px solid #3b82f6;
+}
+
+.signal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.signal-symbol {
+  font-weight: 700;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.signal-direction {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.signal-direction.buy {
+  background: #10b981;
+  color: #fff;
+}
+
+.signal-direction.sell {
+  background: #ef4444;
+  color: #fff;
+}
+
+.confidence-badge {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.confidence-badge.very-high {
+  background: #10b981;
+  color: #fff;
+}
+
+.confidence-badge.high {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.confidence-badge.medium {
+  background: #f59e0b;
+  color: #000;
+}
+
+.confidence-badge.low {
+  background: #6b7280;
+  color: #fff;
+}
+
+.signal-reason {
+  color: #9ca3af;
+  font-size: 0.9rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ML Insights */
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.insight-item {
+  background: #1a1a28;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.insight-label {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.insight-value {
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+/* Sentiment */
+.sentiment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sentiment-overall {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sentiment-badge {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+}
+
+.sentiment-badge.bullish {
+  background: #10b981;
+  color: #fff;
+}
+
+.sentiment-badge.bearish {
+  background: #ef4444;
+  color: #fff;
+}
+
+.sentiment-badge.neutral {
+  background: #6b7280;
+  color: #fff;
+}
+
+.sentiment-score {
+  color: #9ca3af;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.sentiment-summary {
+  color: #d1d5db;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Risk Assessment */
+.risk-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.risk-level {
+  display: flex;
+  align-items: center;
+}
+
+.risk-badge {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+}
+
+.risk-badge.low {
+  background: #10b981;
+  color: #fff;
+}
+
+.risk-badge.medium {
+  background: #f59e0b;
+  color: #000;
+}
+
+.risk-badge.high {
+  background: #ef4444;
+  color: #fff;
+}
+
+.risk-factors {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.risk-factors li {
+  color: #d1d5db;
+  font-size: 0.9rem;
+  padding-left: 20px;
+  position: relative;
+}
+
+.risk-factors li::before {
+  content: "•";
+  position: absolute;
+  left: 8px;
+  color: #ef4444;
+  font-weight: 700;
+}
+
+/* AI Reasoning */
+.reasoning-text {
+  background: #1a1a28;
+  border-radius: 6px;
+  padding: 14px;
+  border-left: 3px solid #8b5cf6;
+}
+
+.reasoning-text p {
+  color: #d1d5db;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Footer */
+.analysis-footer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #2a2a3e;
+  text-align: right;
+}
+
+.last-updated {
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .insights-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .signal-header {
+    flex-wrap: wrap;
+  }
+
+  .confidence-badge {
+    margin-left: 0;
+  }
+}

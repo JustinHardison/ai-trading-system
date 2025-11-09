@@ -1,0 +1,372 @@
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/numpy/_core/_methods.py:52: RuntimeWarning: overflow encountered in reduce
+  return umr_sum(a, axis, dtype, out, keepdims, initial, where)
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pandas/core/generic.py:2153: RuntimeWarning: overflow encountered in cast
+  arr = np.asarray(values, dtype=dtype)
+Traceback (most recent call last):
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 184, in train_all_symbols
+    model = train_symbol_model(symbol, X_train, X_test, y_train, y_test)
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 101, in train_symbol_model
+    rf_model.fit(X_train, y_train)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py", line 1389, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/ensemble/_forest.py", line 375, in fit
+    estimator._compute_missing_values_in_feature_mask(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        X, estimator_name=self.__class__.__name__
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/tree/_classes.py", line 222, in _compute_missing_values_in_feature_mask
+    _assert_all_finite_element_wise(X, xp=np, allow_nan=True, **common_kwargs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/utils/validation.py", line 169, in _assert_all_finite_element_wise
+    raise ValueError(msg_err)
+ValueError: Input X contains infinity or a value too large for dtype('float32').
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/numpy/_core/_methods.py:52: RuntimeWarning: overflow encountered in reduce
+  return umr_sum(a, axis, dtype, out, keepdims, initial, where)
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pandas/core/generic.py:2153: RuntimeWarning: overflow encountered in cast
+  arr = np.asarray(values, dtype=dtype)
+Traceback (most recent call last):
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 184, in train_all_symbols
+    model = train_symbol_model(symbol, X_train, X_test, y_train, y_test)
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 101, in train_symbol_model
+    rf_model.fit(X_train, y_train)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py", line 1389, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/ensemble/_forest.py", line 375, in fit
+    estimator._compute_missing_values_in_feature_mask(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        X, estimator_name=self.__class__.__name__
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/tree/_classes.py", line 222, in _compute_missing_values_in_feature_mask
+    _assert_all_finite_element_wise(X, xp=np, allow_nan=True, **common_kwargs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/utils/validation.py", line 169, in _assert_all_finite_element_wise
+    raise ValueError(msg_err)
+ValueError: Input X contains infinity or a value too large for dtype('float32').
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/numpy/_core/_methods.py:52: RuntimeWarning: overflow encountered in reduce
+  return umr_sum(a, axis, dtype, out, keepdims, initial, where)
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pandas/core/generic.py:2153: RuntimeWarning: overflow encountered in cast
+  arr = np.asarray(values, dtype=dtype)
+Traceback (most recent call last):
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 184, in train_all_symbols
+    model = train_symbol_model(symbol, X_train, X_test, y_train, y_test)
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 101, in train_symbol_model
+    rf_model.fit(X_train, y_train)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py", line 1389, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/ensemble/_forest.py", line 375, in fit
+    estimator._compute_missing_values_in_feature_mask(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        X, estimator_name=self.__class__.__name__
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/tree/_classes.py", line 222, in _compute_missing_values_in_feature_mask
+    _assert_all_finite_element_wise(X, xp=np, allow_nan=True, **common_kwargs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/utils/validation.py", line 169, in _assert_all_finite_element_wise
+    raise ValueError(msg_err)
+ValueError: Input X contains infinity or a value too large for dtype('float32').
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/numpy/_core/_methods.py:52: RuntimeWarning: overflow encountered in reduce
+  return umr_sum(a, axis, dtype, out, keepdims, initial, where)
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pandas/core/generic.py:2153: RuntimeWarning: overflow encountered in cast
+  arr = np.asarray(values, dtype=dtype)
+Traceback (most recent call last):
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 184, in train_all_symbols
+    model = train_symbol_model(symbol, X_train, X_test, y_train, y_test)
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 101, in train_symbol_model
+    rf_model.fit(X_train, y_train)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py", line 1389, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/ensemble/_forest.py", line 375, in fit
+    estimator._compute_missing_values_in_feature_mask(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        X, estimator_name=self.__class__.__name__
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/tree/_classes.py", line 222, in _compute_missing_values_in_feature_mask
+    _assert_all_finite_element_wise(X, xp=np, allow_nan=True, **common_kwargs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/utils/validation.py", line 169, in _assert_all_finite_element_wise
+    raise ValueError(msg_err)
+ValueError: Input X contains infinity or a value too large for dtype('float32').
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/numpy/_core/_methods.py:52: RuntimeWarning: overflow encountered in reduce
+  return umr_sum(a, axis, dtype, out, keepdims, initial, where)
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pandas/core/generic.py:2153: RuntimeWarning: overflow encountered in cast
+  arr = np.asarray(values, dtype=dtype)
+Traceback (most recent call last):
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 184, in train_all_symbols
+    model = train_symbol_model(symbol, X_train, X_test, y_train, y_test)
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 101, in train_symbol_model
+    rf_model.fit(X_train, y_train)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py", line 1389, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/ensemble/_forest.py", line 375, in fit
+    estimator._compute_missing_values_in_feature_mask(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        X, estimator_name=self.__class__.__name__
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/tree/_classes.py", line 222, in _compute_missing_values_in_feature_mask
+    _assert_all_finite_element_wise(X, xp=np, allow_nan=True, **common_kwargs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/utils/validation.py", line 169, in _assert_all_finite_element_wise
+    raise ValueError(msg_err)
+ValueError: Input X contains infinity or a value too large for dtype('float32').
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/numpy/_core/_methods.py:52: RuntimeWarning: overflow encountered in reduce
+  return umr_sum(a, axis, dtype, out, keepdims, initial, where)
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pandas/core/generic.py:2153: RuntimeWarning: overflow encountered in cast
+  arr = np.asarray(values, dtype=dtype)
+Traceback (most recent call last):
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 184, in train_all_symbols
+    model = train_symbol_model(symbol, X_train, X_test, y_train, y_test)
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 101, in train_symbol_model
+    rf_model.fit(X_train, y_train)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py", line 1389, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/ensemble/_forest.py", line 375, in fit
+    estimator._compute_missing_values_in_feature_mask(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        X, estimator_name=self.__class__.__name__
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/tree/_classes.py", line 222, in _compute_missing_values_in_feature_mask
+    _assert_all_finite_element_wise(X, xp=np, allow_nan=True, **common_kwargs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/utils/validation.py", line 169, in _assert_all_finite_element_wise
+    raise ValueError(msg_err)
+ValueError: Input X contains infinity or a value too large for dtype('float32').
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/numpy/_core/_methods.py:52: RuntimeWarning: overflow encountered in reduce
+  return umr_sum(a, axis, dtype, out, keepdims, initial, where)
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pandas/core/generic.py:2153: RuntimeWarning: overflow encountered in cast
+  arr = np.asarray(values, dtype=dtype)
+Traceback (most recent call last):
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 184, in train_all_symbols
+    model = train_symbol_model(symbol, X_train, X_test, y_train, y_test)
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 101, in train_symbol_model
+    rf_model.fit(X_train, y_train)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py", line 1389, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/ensemble/_forest.py", line 375, in fit
+    estimator._compute_missing_values_in_feature_mask(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        X, estimator_name=self.__class__.__name__
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/tree/_classes.py", line 222, in _compute_missing_values_in_feature_mask
+    _assert_all_finite_element_wise(X, xp=np, allow_nan=True, **common_kwargs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/utils/validation.py", line 169, in _assert_all_finite_element_wise
+    raise ValueError(msg_err)
+ValueError: Input X contains infinity or a value too large for dtype('float32').
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/numpy/_core/_methods.py:52: RuntimeWarning: overflow encountered in reduce
+  return umr_sum(a, axis, dtype, out, keepdims, initial, where)
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pandas/core/generic.py:2153: RuntimeWarning: overflow encountered in cast
+  arr = np.asarray(values, dtype=dtype)
+Traceback (most recent call last):
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 184, in train_all_symbols
+    model = train_symbol_model(symbol, X_train, X_test, y_train, y_test)
+  File "/Users/justinhardison/ai-trading-system/TRAIN_ALL_SYMBOLS_PROPERLY.py", line 101, in train_symbol_model
+    rf_model.fit(X_train, y_train)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py", line 1389, in wrapper
+    return fit_method(estimator, *args, **kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/ensemble/_forest.py", line 375, in fit
+    estimator._compute_missing_values_in_feature_mask(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        X, estimator_name=self.__class__.__name__
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/tree/_classes.py", line 222, in _compute_missing_values_in_feature_mask
+    _assert_all_finite_element_wise(X, xp=np, allow_nan=True, **common_kwargs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/utils/validation.py", line 169, in _assert_all_finite_element_wise
+    raise ValueError(msg_err)
+ValueError: Input X contains infinity or a value too large for dtype('float32').
+
+================================================================================
+TRAINING ALL SYMBOLS - SYMBOL-SPECIFIC MODELS
+================================================================================
+
+Indices: ['us30', 'us100', 'us500']
+Forex: ['eurusd', 'gbpusd', 'usdjpy']
+Commodities: ['xau', 'usoil']
+
+================================================================================
+LOADING DATA: US30
+================================================================================
+✅ Loaded 30410 rows
+✅ Features: 73
+✅ Samples: 30410
+✅ Target distribution: {0: 15296, 1: 15114}
+
+================================================================================
+TRAINING: US30
+================================================================================
+Category: INDEX
+Training samples: 24328
+Test samples: 6082
+
+1. Training RandomForest...
+❌ Error training us30: Input X contains infinity or a value too large for dtype('float32').
+
+================================================================================
+LOADING DATA: US100
+================================================================================
+✅ Loaded 30347 rows
+✅ Features: 73
+✅ Samples: 30347
+✅ Target distribution: {1: 15437, 0: 14910}
+
+================================================================================
+TRAINING: US100
+================================================================================
+Category: INDEX
+Training samples: 24277
+Test samples: 6070
+
+1. Training RandomForest...
+❌ Error training us100: Input X contains infinity or a value too large for dtype('float32').
+
+================================================================================
+LOADING DATA: US500
+================================================================================
+✅ Loaded 30398 rows
+✅ Features: 73
+✅ Samples: 30398
+✅ Target distribution: {1: 15286, 0: 15112}
+
+================================================================================
+TRAINING: US500
+================================================================================
+Category: INDEX
+Training samples: 24318
+Test samples: 6080
+
+1. Training RandomForest...
+❌ Error training us500: Input X contains infinity or a value too large for dtype('float32').
+
+================================================================================
+LOADING DATA: EURUSD
+================================================================================
+✅ Loaded 38237 rows
+✅ Features: 73
+✅ Samples: 38237
+✅ Target distribution: {0: 19438, 1: 18799}
+
+================================================================================
+TRAINING: EURUSD
+================================================================================
+Category: FOREX
+Training samples: 30589
+Test samples: 7648
+
+1. Training RandomForest...
+❌ Error training eurusd: Input X contains infinity or a value too large for dtype('float32').
+
+================================================================================
+LOADING DATA: GBPUSD
+================================================================================
+✅ Loaded 38229 rows
+✅ Features: 73
+✅ Samples: 38229
+✅ Target distribution: {0: 19500, 1: 18729}
+
+================================================================================
+TRAINING: GBPUSD
+================================================================================
+Category: FOREX
+Training samples: 30583
+Test samples: 7646
+
+1. Training RandomForest...
+❌ Error training gbpusd: Input X contains infinity or a value too large for dtype('float32').
+
+================================================================================
+LOADING DATA: USDJPY
+================================================================================
+✅ Loaded 38235 rows
+✅ Features: 73
+✅ Samples: 38235
+✅ Target distribution: {0: 19169, 1: 19066}
+
+================================================================================
+TRAINING: USDJPY
+================================================================================
+Category: FOREX
+Training samples: 30588
+Test samples: 7647
+
+1. Training RandomForest...
+❌ Error training usdjpy: Input X contains infinity or a value too large for dtype('float32').
+
+================================================================================
+LOADING DATA: XAU
+================================================================================
+✅ Loaded 23231 rows
+✅ Features: 73
+✅ Samples: 23231
+✅ Target distribution: {1: 11712, 0: 11519}
+
+================================================================================
+TRAINING: XAU
+================================================================================
+Category: COMMODITY
+Training samples: 18584
+Test samples: 4647
+
+1. Training RandomForest...
+❌ Error training xau: Input X contains infinity or a value too large for dtype('float32').
+
+================================================================================
+LOADING DATA: USOIL
+================================================================================
+✅ Loaded 19767 rows
+✅ Features: 73
+✅ Samples: 19767
+✅ Target distribution: {0: 10330, 1: 9437}
+
+================================================================================
+TRAINING: USOIL
+================================================================================
+Category: COMMODITY
+Training samples: 15813
+Test samples: 3954
+
+1. Training RandomForest...
+❌ Error training usoil: Input X contains infinity or a value too large for dtype('float32').
+
+================================================================================
+TRAINING SUMMARY
+================================================================================
+❌ US30    : FAILED
+❌ US100   : FAILED
+❌ US500   : FAILED
+❌ EURUSD  : FAILED
+❌ GBPUSD  : FAILED
+❌ USDJPY  : FAILED
+❌ XAU     : FAILED
+❌ USOIL   : FAILED
+
+================================================================================
+✅ TRAINING COMPLETE: 0/8 symbols
+================================================================================
+
+✅ All symbol-specific models trained
+Each instrument now has its own dedicated model
+Ready for trading!

@@ -1,0 +1,19 @@
+{
+    "account_id": "1600060464",
+    "share_url": "https://trader.ftmo.oanda.com/live-metrix/1600060464/share/019b37a3-394a-7088-9956-2af0345078cf?lang=en-US",
+    "account_type": "FTMO US",
+    "platform": "MT5",
+    "account_size": 200000.00,
+    "max_daily_loss": 10000.00,
+    "max_daily_loss_pct": 5.0,
+    "max_total_loss": 20000.00,
+    "max_total_loss_pct": 10.0,
+    "profit_target": 10000.00,
+    "profit_target_pct": 5.0,
+    "start_date": "2025-12-16",
+    "end_date": "2025-12-29",
+    "status": "Active",
+    "trial_type": "Free trial",
+    "min_trading_days": 2,
+    "notes": "EA sends live data (balance, equity, daily_pnl, max_daily_loss, max_total_drawdown). This config is for reference and to update the share URL when account changes."
+}

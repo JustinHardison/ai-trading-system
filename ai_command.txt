@@ -1,0 +1,7 @@
+{
+  "action": "GET_BARS",
+  "symbol": "NZDCHF.sim",
+  "timeframe": "H1",
+  "bars": 100,
+  "timestamp": "2025-11-03T08:43:09.642184"
+}

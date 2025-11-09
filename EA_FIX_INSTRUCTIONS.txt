@@ -1,0 +1,87 @@
+EA FIX REQUIRED - CRITICAL ISSUE
+=================================
+
+THE PROBLEM:
+The EA is blocking BUY/SELL actions when ANY position exists, even on DIFFERENT symbols.
+
+WHAT'S HAPPENING:
+1. API/AI approves: BUY GBPUSD @ 62.2%
+2. API sends: action="BUY", lot_size=1.0
+3. EA blocks it: "Already have position on GBPUSD.sim - skipping BUY"
+
+WHY THIS IS WRONG:
+- The EA should allow positions on DIFFERENT symbols
+- The EA should execute SCALE_IN/DCA actions (which the API already sends correctly)
+- The EA is making trading decisions instead of executing AI decisions
+
+THE FIX IN AI_Trading_EA_Ultimate.mq5:
+======================================
+
+FIND THIS CODE (around line where it checks for existing positions):
+```
+if (PositionSelect(symbol)) {
+    Print("Already have position on ", symbol, " - skipping ", action);
+    return;
+}
+```
+
+REPLACE WITH:
+```
+// Allow SCALE_IN and DCA actions even if position exists
+if (action == "SCALE_IN" || action == "DCA") {
+    Print("AI wants to ", action, " - executing");
+    // Continue to OrderSend
+}
+// Only block if trying to open NEW position on SAME symbol
+else if (action == "BUY" || action == "SELL") {
+    if (PositionSelect(symbol)) {
+        Print("Already have position on ", symbol, " - skipping duplicate ", action);
+        return;
+    }
+}
+```
+
+OR BETTER YET - TRUST THE AI COMPLETELY:
+```
+// Remove the position check entirely
+// The AI already handles this logic intelligently
+// Just execute what the AI decides
+
+if (action == "BUY") {
+    OrderSend(...);
+}
+else if (action == "SELL") {
+    OrderSend(...);
+}
+else if (action == "SCALE_IN" || action == "DCA") {
+    OrderSend(...);  // Add to position
+}
+else if (action == "SCALE_OUT") {
+    OrderClose(...);  // Reduce position
+}
+else if (action == "CLOSE") {
+    OrderClose(...);  // Close entire position
+}
+```
+
+WHY THE AI IS SMARTER:
+======================
+The API already:
+- Checks for existing positions
+- Decides when to SCALE_IN (add to winners)
+- Decides when to DCA (average down on losers)
+- Decides when to open new trades on different symbols
+- Uses 115 features to make intelligent decisions
+
+The EA should EXECUTE these decisions, not BLOCK them!
+
+CURRENT IMPACT:
+===============
+- Missing SCALE_IN opportunities (can't compound winners)
+- Missing DCA opportunities (can't average down)
+- Missing new trades on different symbols (can't diversify)
+- AI decisions being overridden by hard-coded EA logic
+
+PRIORITY: CRITICAL
+==================
+This is preventing the AI-driven trading system from working as designed.

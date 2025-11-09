@@ -1,0 +1,37 @@
+# Dockerfile for Deep Learning Model Training
+# Uses Python base image + TensorFlow (Linux-based, no macOS mutex issues)
+
+FROM --platform=linux/arm64 python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    tensorflow \
+    pandas \
+    numpy \
+    scikit-learn \
+    loguru \
+    ta \
+    joblib \
+    xgboost
+
+# Copy project files
+COPY src/ /app/src/
+COPY us30_historical_data.csv /app/
+COPY models/ /app/models/
+
+# Create models directory if it doesn't exist
+RUN mkdir -p /app/models
+
+# Set environment variable to avoid TensorFlow warnings
+ENV TF_CPP_MIN_LOG_LEVEL=2
+
+# Run training script
+CMD ["python", "src/training/train_deep_learning.py"]

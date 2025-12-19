@@ -9,6 +9,8 @@ NO HARDCODED THRESHOLDS - All decisions based on:
 Every decision is a comparison of EVs - the action with highest EV wins.
 """
 import logging
+import json
+import os
 from typing import Dict
 from datetime import datetime
 import pytz
@@ -17,6 +19,9 @@ from .ai_market_analyzer import get_ai_analyzer, AIMarketState
 from .ftmo_strategy import get_ftmo_strategy
 
 logger = logging.getLogger(__name__)
+
+# Persistent peak tracking file
+PEAK_TRACKING_FILE = os.path.join(os.path.dirname(__file__), '../../cache/position_peaks.json')
 
 
 class EVExitManagerV2:
@@ -38,10 +43,60 @@ class EVExitManagerV2:
     """
     
     def __init__(self):
-        self.position_peaks = {}  # Track peak profit per symbol
+        self.position_peaks = self._load_peaks()  # Track peak profit per symbol (persistent)
         self.last_action_state = {}  # Track market state at last action for anti-churn
         self.ftmo_strategy = get_ftmo_strategy()  # Session awareness
         logger.info("🤖 EV Exit Manager V2 - Pure AI-driven, zero hardcoded thresholds")
+        logger.info(f"   📊 Loaded {len(self.position_peaks)} position peaks from persistent storage")
+    
+    def _load_peaks(self) -> Dict:
+        """Load peak tracking from persistent file"""
+        try:
+            if os.path.exists(PEAK_TRACKING_FILE):
+                with open(PEAK_TRACKING_FILE, 'r') as f:
+                    data = json.load(f)
+                    logger.info(f"📊 Loaded position peaks from {PEAK_TRACKING_FILE}")
+                    return data
+        except Exception as e:
+            logger.warning(f"Could not load peaks file: {e}")
+        return {}
+    
+    def _save_peaks(self):
+        """Save peak tracking to persistent file"""
+        try:
+            os.makedirs(os.path.dirname(PEAK_TRACKING_FILE), exist_ok=True)
+            with open(PEAK_TRACKING_FILE, 'w') as f:
+                json.dump(self.position_peaks, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Could not save peaks file: {e}")
+    
+    def update_peak(self, symbol: str, profit_pct: float, current_price: float = 0):
+        """Update peak profit for a symbol and persist to file"""
+        symbol_key = symbol.upper()
+        current_peak = self.position_peaks.get(symbol_key, {}).get('peak_profit_pct', float('-inf'))
+        
+        if profit_pct > current_peak:
+            self.position_peaks[symbol_key] = {
+                'peak_profit_pct': profit_pct,
+                'peak_price': current_price,
+                'peak_time': datetime.now().isoformat(),
+                'updated': datetime.now().isoformat()
+            }
+            self._save_peaks()
+            logger.info(f"   📈 NEW PEAK for {symbol_key}: {profit_pct:.3f}% (saved to disk)")
+    
+    def get_peak(self, symbol: str) -> float:
+        """Get peak profit for a symbol"""
+        symbol_key = symbol.upper()
+        return self.position_peaks.get(symbol_key, {}).get('peak_profit_pct', 0.0)
+    
+    def clear_peak(self, symbol: str):
+        """Clear peak when position is closed"""
+        symbol_key = symbol.upper()
+        if symbol_key in self.position_peaks:
+            del self.position_peaks[symbol_key]
+            self._save_peaks()
+            logger.info(f"   🗑️ Cleared peak for {symbol_key} (position closed)")
     
     # ═══════════════════════════════════════════════════════════
     # SESSION AWARENESS - Same logic as entry system
@@ -301,14 +356,17 @@ class EVExitManagerV2:
             h1_support_score * 0.20
         )
         
-        # Position size factor - larger positions need more patience
+        # Position size factor - LARGER positions need LESS patience (tighter risk)
+        # This is hedge fund risk management: bigger position = protect it more aggressively
         size_ratio = current_volume / max_lots if max_lots > 0 else 0.5
-        size_patience_factor = min(1.0, size_ratio * 1.5)  # 0-1, larger = more patience needed
+        # Invert: larger position = LOWER patience factor = faster exits
+        size_risk_factor = max(0.3, 1.0 - size_ratio * 0.7)  # 1.0 (small) to 0.3 (large)
         
-        # Combined setup score: HTF alignment + size factor
+        # Combined setup score: HTF alignment adjusted by size risk
         # Higher score = need more patience = SWING
         # Lower score = less patience needed = SCALP
-        setup_score = htf_alignment_score * 0.8 + size_patience_factor * 0.2
+        # CRITICAL: Large positions REDUCE the score (faster exits)
+        setup_score = htf_alignment_score * 0.8 * size_risk_factor + 0.2
         
         # AI-driven setup classification based on continuous score
         # No hardcoded thresholds - score naturally determines setup type
@@ -321,7 +379,7 @@ class EVExitManagerV2:
         
         logger.info(f"   🧠 AI Setup Classification: {setup_type}")
         logger.info(f"      HTF alignment: {htf_alignment_score:.2f} (D1={d1_support_score:.2f}, H4={h4_support_score:.2f}, H1={h1_support_score:.2f})")
-        logger.info(f"      Size patience: {size_patience_factor:.2f} (ratio={size_ratio:.2f})")
+        logger.info(f"      Size risk factor: {size_risk_factor:.2f} (ratio={size_ratio:.2f}) - larger=tighter")
         logger.info(f"      Setup score: {setup_score:.2f}")
         
         logger.info(f"   📊 Setup Type: {setup_type} (D1={d1_trend:.2f}, H4={h4_trend:.2f}, size={size_ratio:.2f})")
@@ -2934,10 +2992,18 @@ class EVExitManagerV2:
         # If giveback > threshold (based on thesis quality), trigger protection
         # ═══════════════════════════════════════════════════════════
         
-        # Get peak profit from context (tracked by EA or API)
-        peak_profit_pct = getattr(context, 'peak_profit_pct', profit_pct)
-        if peak_profit_pct < profit_pct:
-            peak_profit_pct = profit_pct  # Current is the new peak
+        # Get peak profit from PERSISTENT storage (survives API restarts)
+        peak_symbol_key = getattr(context, 'symbol', 'UNKNOWN').upper()  # Get from context
+        stored_peak = self.get_peak(peak_symbol_key)
+        context_peak = getattr(context, 'peak_profit_pct', profit_pct)
+        
+        # Use the higher of stored peak or context peak
+        peak_profit_pct = max(stored_peak, context_peak, profit_pct)
+        
+        # Update persistent storage if current profit is new peak
+        if profit_pct > stored_peak:
+            current_price = getattr(context, 'current_price', 0)
+            self.update_peak(peak_symbol_key, profit_pct, current_price)
         
         # Calculate giveback from peak
         peak_giveback = 0.0
@@ -2949,10 +3015,13 @@ class EVExitManagerV2:
                 giveback_amount = peak_profit_pct - profit_pct
                 peak_giveback = giveback_amount / peak_profit_pct if peak_profit_pct > 0 else 0
                 
-                # AI-driven giveback threshold based on thesis quality
+                # AI-driven giveback threshold based on thesis quality AND position size
                 # Strong thesis (0.8) = allow 50% giveback before concern
                 # Weak thesis (0.2) = only allow 20% giveback
-                allowed_giveback = 0.2 + (thesis_quality * 0.4)  # 0.2 to 0.6
+                # CRITICAL: Larger positions = TIGHTER giveback threshold
+                size_ratio = current_volume / max_lots if max_lots > 0 else 0.5
+                size_tightening = size_ratio * 0.2  # Large position reduces allowed giveback by up to 20%
+                allowed_giveback = max(0.15, 0.2 + (thesis_quality * 0.4) - size_tightening)  # 0.15 to 0.6
                 
                 if peak_giveback > allowed_giveback:
                     # We've given back too much - this is a reversal signal
@@ -2960,13 +3029,16 @@ class EVExitManagerV2:
                     
                     # Premium scales with how much we've exceeded the threshold
                     # AND with the absolute profit we're risking
-                    peak_giveback_premium = excess_giveback * peak_profit_pct * (1.0 - thesis_quality)
+                    # CRITICAL: Larger positions = STRONGER exit pressure
+                    size_multiplier = 1.0 + size_ratio  # 1.0 to 2.0x for large positions
+                    peak_giveback_premium = excess_giveback * peak_profit_pct * (1.0 - thesis_quality) * size_multiplier
                     
                     logger.info(f"   🚨 PEAK PROFIT GIVEBACK WARNING:")
                     logger.info(f"      Peak profit: {peak_profit_pct:.3f}%")
                     logger.info(f"      Current profit: {profit_pct:.3f}%")
                     logger.info(f"      Giveback: {peak_giveback:.1%} (allowed: {allowed_giveback:.1%})")
-                    logger.info(f"      Giveback premium: {peak_giveback_premium:.4f}%")
+                    logger.info(f"      Size ratio: {size_ratio:.2f} (larger = tighter threshold)")
+                    logger.info(f"      Giveback premium: {peak_giveback_premium:.4f}% (size mult: {size_multiplier:.2f}x)")
         
         # ═══════════════════════════════════════════════════════════
         # HEDGE FUND IMPROVEMENT #6: REGIME DETECTION (RISK-ON/OFF)
@@ -3121,6 +3193,57 @@ class EVExitManagerV2:
             logger.info(f"      Exit premium: {order_flow_exit_premium:.4f}%")
         
         # ═══════════════════════════════════════════════════════════
+        # HEDGE FUND IMPROVEMENT #10: LTF EARLY WARNING FOR LARGE POSITIONS
+        # 
+        # When position is scaled-in (larger than normal), LTF divergence
+        # from HTF is an early warning signal. If M15/M30 are turning
+        # while HTF still holds, that's often the start of a reversal.
+        # 
+        # For large positions, we should be MORE sensitive to LTF warnings.
+        # ═══════════════════════════════════════════════════════════
+        
+        ltf_warning_premium = 0.0
+        size_ratio = current_volume / max_lots if max_lots > 0 else 0.5
+        
+        # Only apply LTF warning for larger positions (> 30% of max)
+        if size_ratio > 0.3:
+            m15_trend = getattr(context, 'm15_trend', 0.5)
+            m30_trend = getattr(context, 'm30_trend', 0.5)
+            h1_trend = market_data.get('h1_trend', 0.5)
+            h4_trend = market_data.get('h4_trend', 0.5)
+            
+            # Calculate LTF average
+            ltf_avg = (m15_trend + m30_trend) / 2
+            # Calculate HTF average
+            htf_avg = (h1_trend + h4_trend) / 2
+            
+            # Check for divergence: LTF turning against position while HTF holds
+            if is_buy:
+                # For BUY: LTF < 0.45 (bearish) while HTF > 0.55 (bullish) = warning
+                ltf_bearish = ltf_avg < 0.45
+                htf_bullish = htf_avg > 0.55
+                ltf_divergence = ltf_bearish and htf_bullish
+                divergence_strength = max(0, 0.5 - ltf_avg) if ltf_divergence else 0
+            else:
+                # For SELL: LTF > 0.55 (bullish) while HTF < 0.45 (bearish) = warning
+                ltf_bullish = ltf_avg > 0.55
+                htf_bearish = htf_avg < 0.45
+                ltf_divergence = ltf_bullish and htf_bearish
+                divergence_strength = max(0, ltf_avg - 0.5) if ltf_divergence else 0
+            
+            if ltf_divergence and divergence_strength > 0.05:
+                # Premium scales with: divergence strength, position size, and profit at risk
+                size_sensitivity = 1.0 + (size_ratio - 0.3) * 2  # 1.0 to 2.4x for large positions
+                ltf_warning_premium = divergence_strength * size_sensitivity * max(0.1, abs(profit_pct)) * 0.5
+                
+                logger.info(f"   ⚠️ LTF EARLY WARNING (Large Position):")
+                logger.info(f"      LTF avg: {ltf_avg:.2f} (M15={m15_trend:.2f}, M30={m30_trend:.2f})")
+                logger.info(f"      HTF avg: {htf_avg:.2f} (H1={h1_trend:.2f}, H4={h4_trend:.2f})")
+                logger.info(f"      Divergence strength: {divergence_strength:.2f}")
+                logger.info(f"      Size sensitivity: {size_sensitivity:.2f}x (ratio={size_ratio:.2f})")
+                logger.info(f"      LTF warning premium: {ltf_warning_premium:.4f}%")
+        
+        # ═══════════════════════════════════════════════════════════
         # COMBINE ALL HEDGE FUND EXIT PREMIUMS
         # ═══════════════════════════════════════════════════════════
         
@@ -3128,7 +3251,8 @@ class EVExitManagerV2:
             peak_giveback_premium +      # #5: Peak profit protection
             regime_exit_premium +        # #6: Regime misalignment
             kelly_exit_adjustment +      # #8: Kelly criterion
-            order_flow_exit_premium      # #9: Order flow
+            order_flow_exit_premium +    # #9: Order flow
+            ltf_warning_premium          # #10: LTF early warning for large positions
         ) * vol_exit_multiplier          # #7: Volatility regime multiplier
         
         if total_hedge_fund_premium > 0.01:
@@ -3137,6 +3261,7 @@ class EVExitManagerV2:
             logger.info(f"      Regime: {regime_exit_premium:.4f}%")
             logger.info(f"      Kelly: {kelly_exit_adjustment:.4f}%")
             logger.info(f"      Order flow: {order_flow_exit_premium:.4f}%")
+            logger.info(f"      LTF warning: {ltf_warning_premium:.4f}%")
             logger.info(f"      Vol multiplier: {vol_exit_multiplier:.2f}x")
         
         # ═══════════════════════════════════════════════════════════

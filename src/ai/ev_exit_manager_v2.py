@@ -131,9 +131,37 @@ class EVExitManagerV2:
         is_forex = any(s in symbol_lower for s in ['eur', 'gbp', 'jpy', 'aud', 'nzd', 'cad', 'chf'])
         is_gold = 'xau' in symbol_lower or 'gold' in symbol_lower
         
-        # Get current UTC hour
+        # Get current UTC hour and day
         utc_now = datetime.now(pytz.UTC)
         current_hour = utc_now.hour
+        day_of_week = utc_now.weekday()  # 0=Monday, 4=Friday, 5=Saturday, 6=Sunday
+        
+        # ═══════════════════════════════════════════════════════════
+        # HEDGE FUND WEEKEND RISK MANAGEMENT
+        # 
+        # Friday afternoon = increased gap risk over weekend
+        # Hedge funds typically:
+        # 1. Reduce position sizes after 2 PM EST (19:00 UTC)
+        # 2. Avoid new entries in last 2-3 hours
+        # 3. Tighten stops on existing positions
+        # 4. Close speculative/weak thesis positions
+        # 
+        # Market closes Friday 5 PM EST (22:00 UTC)
+        # ═══════════════════════════════════════════════════════════
+        
+        is_friday = (day_of_week == 4)
+        is_friday_afternoon = is_friday and current_hour >= 19  # After 2 PM EST
+        is_friday_close = is_friday and current_hour >= 21  # Last hour before close
+        hours_to_close = max(0, 22 - current_hour) if is_friday else 999
+        
+        # Weekend risk multiplier - reduces patience and increases exit pressure
+        weekend_risk_mult = 1.0
+        if is_friday_close:
+            weekend_risk_mult = 0.5  # Very aggressive - close weak positions
+            logger.info(f"   ⚠️ FRIDAY CLOSE ({hours_to_close}h to weekend) - Aggressive exit mode")
+        elif is_friday_afternoon:
+            weekend_risk_mult = 0.7  # Moderately aggressive
+            logger.info(f"   ⚠️ FRIDAY AFTERNOON ({hours_to_close}h to weekend) - Reduced patience")
         
         # Determine session
         if 13 <= current_hour < 16:
@@ -163,13 +191,22 @@ class EVExitManagerV2:
         patience_boost = session_config['patience_boost']
         is_optimal = session_mult >= 1.0
         
+        # Apply weekend risk adjustment to patience
+        # Lower patience = more likely to exit
+        patience_boost = patience_boost * weekend_risk_mult
+        
         return {
             'session_name': session_name,
             'session_mult': session_mult,
             'patience_boost': patience_boost,
             'is_optimal': is_optimal,
             'current_hour_utc': current_hour,
-            'symbol_type': 'index' if is_index else ('forex' if is_forex else ('gold' if is_gold else 'other'))
+            'symbol_type': 'index' if is_index else ('forex' if is_forex else ('gold' if is_gold else 'other')),
+            'is_friday': is_friday,
+            'is_friday_afternoon': is_friday_afternoon,
+            'is_friday_close': is_friday_close,
+            'hours_to_close': hours_to_close,
+            'weekend_risk_mult': weekend_risk_mult
         }
     
     # AI-DRIVEN SETUP CONFIG
@@ -2468,6 +2505,13 @@ class EVExitManagerV2:
         patience_boost = session_context.get('patience_boost', 1.0)
         is_optimal_session = session_context.get('is_optimal', True)
         
+        # Weekend risk awareness
+        is_friday = session_context.get('is_friday', False)
+        is_friday_afternoon = session_context.get('is_friday_afternoon', False)
+        is_friday_close = session_context.get('is_friday_close', False)
+        hours_to_close = session_context.get('hours_to_close', 999)
+        weekend_risk_mult = session_context.get('weekend_risk_mult', 1.0)
+        
         profit_pct = profit_metrics['profit_pct']  # % of ACCOUNT
         profit_dollars = profit_metrics['profit_dollars']
         account_balance = profit_metrics['account_balance']
@@ -3688,7 +3732,34 @@ class EVExitManagerV2:
             logger.info(f"      P&L significance: {pnl_significance:.1%} of expected stop ({expected_stop_pct:.2f}%)")
             logger.info(f"      Thesis quality: {thesis_quality:.2f} (HTF-based) - Let trade develop")
         
-        ev_close = profit_pct - opportunity_cost - total_cost_pct + profit_protection_value + drawdown_close_boost + news_close_boost + daily_profit_close_boost - patience_close_penalty
+        # ═══════════════════════════════════════════════════════════
+        # HEDGE FUND WEEKEND RISK PREMIUM
+        # 
+        # Friday afternoon = gap risk over weekend
+        # Boost CLOSE/SCALE_OUT EV based on:
+        # 1. Hours to market close
+        # 2. Thesis quality (weak thesis = close before weekend)
+        # 3. Position profitability (lock in profits before gap risk)
+        # ═══════════════════════════════════════════════════════════
+        
+        weekend_close_boost = 0.0
+        if is_friday_close:
+            # Last hour before weekend - aggressive exit for weak positions
+            # Strong thesis (0.9) = small boost (0.05%), Weak thesis (0.3) = large boost (0.35%)
+            weekend_close_boost = 0.4 * (1.0 - thesis_quality)
+            # If profitable, add profit protection boost
+            if profit_pct > 0:
+                weekend_close_boost += profit_pct * 0.3  # Lock in 30% of profit value
+            logger.warning(f"   ⚠️ FRIDAY CLOSE: Weekend gap risk boost +{weekend_close_boost:.4f}%")
+        elif is_friday_afternoon:
+            # Friday afternoon - moderate exit pressure
+            weekend_close_boost = 0.2 * (1.0 - thesis_quality)
+            if profit_pct > 0:
+                weekend_close_boost += profit_pct * 0.15  # Lock in 15% of profit value
+            if weekend_close_boost > 0.05:
+                logger.info(f"   ⚠️ FRIDAY AFTERNOON: Weekend risk boost +{weekend_close_boost:.4f}%")
+        
+        ev_close = profit_pct - opportunity_cost - total_cost_pct + profit_protection_value + drawdown_close_boost + news_close_boost + daily_profit_close_boost - patience_close_penalty + weekend_close_boost
         
         if news_close_boost > 0:
             logger.info(f"   📰 NEWS/THESIS RISK: CLOSE boosted by {news_close_boost:.4f}%")
@@ -3884,9 +3955,13 @@ class EVExitManagerV2:
         if daily_profit_boost > 0:
             logger.info(f"   💰 DAILY PROFIT PROTECTION: SCALE_OUT boosted by {daily_profit_boost:.2f}%")
         
+        # Weekend risk boost for SCALE_OUT (proportional to position reduction)
+        weekend_scale_boost_25 = weekend_close_boost * 0.25
+        weekend_scale_boost_50 = weekend_close_boost * 0.50
+        
         # Apply premature exit penalty to SCALE_OUT EV (reduces attractiveness of early exits)
-        ev_scale_out_25 = ((profit_pct * 0.25 - total_cost_pct * 0.25) + 0.75 * ev_hold + risk_reduction_bonus * 0.25 + exhaustion_bonus * 0.25 + profit_protection_premium * 0.25 + drawdown_scale_boost + news_scale_boost * 0.25 + daily_profit_boost * 0.25 - scale_out_premature_penalty * 0.25) * session_scale_out_adj
-        ev_scale_out_50 = ((profit_pct * 0.50 - total_cost_pct * 0.50) + 0.50 * ev_hold + risk_reduction_bonus * 0.50 + exhaustion_bonus * 0.50 + profit_protection_premium * 0.50 + drawdown_scale_boost * 2 + news_scale_boost * 0.50 + daily_profit_boost * 0.50 - scale_out_premature_penalty * 0.50) * session_scale_out_adj
+        ev_scale_out_25 = ((profit_pct * 0.25 - total_cost_pct * 0.25) + 0.75 * ev_hold + risk_reduction_bonus * 0.25 + exhaustion_bonus * 0.25 + profit_protection_premium * 0.25 + drawdown_scale_boost + news_scale_boost * 0.25 + daily_profit_boost * 0.25 - scale_out_premature_penalty * 0.25 + weekend_scale_boost_25) * session_scale_out_adj
+        ev_scale_out_50 = ((profit_pct * 0.50 - total_cost_pct * 0.50) + 0.50 * ev_hold + risk_reduction_bonus * 0.50 + exhaustion_bonus * 0.50 + profit_protection_premium * 0.50 + drawdown_scale_boost * 2 + news_scale_boost * 0.50 + daily_profit_boost * 0.50 - scale_out_premature_penalty * 0.50 + weekend_scale_boost_50) * session_scale_out_adj
         
         if profit_protection_premium > 0:
             logger.info(f"   💰 Profit Protection: SCALE_OUT boosted by {profit_protection_premium * 0.25:.4f}% (25%) / {profit_protection_premium * 0.50:.4f}% (50%)")
@@ -4084,6 +4159,11 @@ class EVExitManagerV2:
         if not can_scale_in:
             ev_scale_in = ev_hold - 1.0  # Safety: at max position
             logger.info(f"   🚫 SCALE_IN blocked: Position at max or not allowed")
+        elif is_friday_afternoon:
+            # HEDGE FUND RULE: No adding to positions on Friday afternoon
+            # Gap risk over weekend is too high to increase exposure
+            ev_scale_in = ev_hold - 0.5  # Always worse than HOLD
+            logger.warning(f"   🚫 SCALE_IN blocked: Friday afternoon - no new exposure before weekend")
         else:
             # Apply thesis quality to SCALE_IN decision
             # Only add to positions when thesis is strong (D1 supports)

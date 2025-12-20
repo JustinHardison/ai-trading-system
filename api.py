@@ -26,6 +26,7 @@ from src.utils.market_hours import MarketHours
 from src.ai.unified_trading_system import UnifiedTradingSystem
 from src.ai.elite_position_sizer import ElitePositionSizer
 from src.ai.portfolio_state import get_portfolio_state
+from src.utils.trade_journal import log_closed_trade, get_trade_stats
 
 # ═══════════════════════════════════════════════════════════════════
 # STRUCTURED MODEL OUTPUT BUILDER
@@ -940,6 +941,50 @@ async def ai_trade_decision(request: dict):
                 # Only log trades with actual P&L
                 if trade_profit != 0:
                     logger.info(f"   Trade #{trade_ticket} ({trade_symbol}): ${trade_profit:.2f} gross, ${trade_net:.2f} net ({trade_volume} lots) [{trade_entry_type}]")
+                    
+                    # ═══════════════════════════════════════════════════════════
+                    # PERSISTENT TRADE JOURNAL
+                    # Log every closed trade for post-analysis
+                    # ═══════════════════════════════════════════════════════════
+                    trade_direction = 'BUY' if trade_type == 0 else 'SELL'
+                    trade_open_time = trade.get('time_open', 0)
+                    trade_entry_price = float(trade.get('price_open', 0))
+                    trade_exit_price = float(trade.get('price_close', 0))
+                    
+                    # Get session context for the trade
+                    from datetime import datetime
+                    import pytz
+                    utc_now = datetime.now(pytz.UTC)
+                    is_friday = utc_now.weekday() == 4
+                    current_hour = utc_now.hour
+                    if 13 <= current_hour < 16:
+                        trade_session = 'overlap'
+                    elif 13 <= current_hour < 21:
+                        trade_session = 'new_york'
+                    elif 8 <= current_hour < 16:
+                        trade_session = 'london'
+                    else:
+                        trade_session = 'asian'
+                    
+                    # Log to persistent journal
+                    log_closed_trade(
+                        ticket=trade_ticket,
+                        symbol=trade_symbol,
+                        direction=trade_direction,
+                        lots=trade_volume,
+                        entry_price=trade_entry_price,
+                        exit_price=trade_exit_price,
+                        gross_pnl=trade_profit,
+                        net_pnl=trade_net,
+                        swap=trade_swap,
+                        commission=trade_commission,
+                        open_time=trade_open_time,
+                        close_time=trade_close_time,
+                        setup_type=trade_entry_type,
+                        exit_reason=trade_entry_type,  # EA sends this as entry_type
+                        session=trade_session,
+                        is_friday=is_friday
+                    )
                 
                 # ═══════════════════════════════════════════════════════════
                 # ANTI-CHURN: Register ALL recent closes (including stop loss hits)
@@ -1990,6 +2035,44 @@ async def ai_exit_decision(request: dict):
             "should_exit": False,
             "reason": f"Error: {str(e)}"
         }
+
+# ═══════════════════════════════════════════════════════════════════
+# TRADE JOURNAL API
+# Query closed trades for post-analysis
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/trades")
+async def get_trades(days: int = 7, symbol: str = None):
+    """
+    Get recent closed trades from the journal.
+    
+    Query params:
+    - days: Number of days to look back (default 7)
+    - symbol: Optional symbol filter
+    """
+    from src.utils.trade_journal import get_recent_trades, get_trade_stats, get_losing_trades
+    
+    trades = get_recent_trades(days, symbol)
+    stats = get_trade_stats(days)
+    losers = get_losing_trades(days)
+    
+    return {
+        "trades": trades,
+        "stats": stats,
+        "losers": losers,
+        "count": len(trades),
+        "loser_count": len(losers)
+    }
+
+@app.get("/trades/{ticket}")
+async def get_trade_detail(ticket: int):
+    """Get detailed context for a specific trade"""
+    from src.utils.trade_journal import get_trade_details
+    
+    details = get_trade_details(ticket)
+    if details:
+        return details
+    return {"error": f"Trade #{ticket} not found in journal"}
 
 # ═══════════════════════════════════════════════════════════════════
 # HEALTH CHECK

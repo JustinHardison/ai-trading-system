@@ -443,6 +443,8 @@ class EVExitManagerV2:
         session_mult = session_context['session_mult']
         patience_boost = session_context['patience_boost']
         is_optimal_session = session_context['is_optimal']
+        is_friday_afternoon = session_context.get('is_friday_afternoon', False)
+        is_friday_close = session_context.get('is_friday_close', False)
         
         logger.info(f"   📊 Session: {session_name.upper()} (mult={session_mult:.2f}x, patience_boost={patience_boost:.2f}x, optimal={is_optimal_session})")
         
@@ -1070,6 +1072,42 @@ class EVExitManagerV2:
                 if thesis_quality < 0.2 and current_profit_pct < 0:
                     logger.info(f"   ⚠️ WEAK THESIS ({thesis_quality:.2f}) + LOSING → allowing {best_action}")
                     logger.info(f"      Thesis too weak to justify holding a losing position")
+                # ═══════════════════════════════════════════════════════════
+                # HEDGE FUND WEEKEND RISK OVERRIDE
+                # 
+                # On Friday afternoon with a losing position, lower the threshold
+                # significantly. Gap risk over weekend is too high to hold losers.
+                # ═══════════════════════════════════════════════════════════
+                elif is_friday_afternoon and current_profit_pct < 0:
+                    # Friday + losing = much lower threshold (0.05% instead of 0.15-0.25%)
+                    weekend_threshold = MIN_EXIT_ADVANTAGE * 0.3  # 0.05% threshold
+                    if ev_advantage >= weekend_threshold:
+                        logger.warning(f"   ⚠️ FRIDAY + LOSING → allowing {best_action} (weekend risk override)")
+                        logger.info(f"      EV advantage {ev_advantage:.4f}% >= weekend threshold {weekend_threshold:.4f}%")
+                    else:
+                        logger.info(f"   ⏸️ {best_action} advantage too small ({ev_advantage:.4f}% < {required_advantage:.4f}%) - defaulting to HOLD")
+                        logger.info(f"      (Even with weekend risk, advantage below {weekend_threshold:.4f}%)")
+                        best_action = 'HOLD'
+                        best_ev = hold_ev
+                # ═══════════════════════════════════════════════════════════
+                # LARGE POSITION RISK OVERRIDE
+                # 
+                # For large positions (>50% of max), lower the threshold.
+                # Larger positions = more risk = easier to reduce.
+                # ═══════════════════════════════════════════════════════════
+                elif current_volume / max_lots > 0.5 and current_profit_pct < 0:
+                    # Large position + losing = lower threshold (0.08% instead of 0.15-0.25%)
+                    size_threshold = MIN_EXIT_ADVANTAGE * 0.5  # 0.075% threshold
+                    if ev_advantage >= size_threshold:
+                        logger.warning(f"   ⚠️ LARGE POSITION ({current_volume:.1f}/{max_lots:.1f}) + LOSING → allowing {best_action}")
+                        logger.info(f"      EV advantage {ev_advantage:.4f}% >= size threshold {size_threshold:.4f}%")
+                    else:
+                        logger.info(f"   ⏸️ {best_action} advantage too small ({ev_advantage:.4f}% < {required_advantage:.4f}%) - defaulting to HOLD")
+                        logger.info(f"      AI uncertainty: {ai_uncertainty:.2f} (cont={cont_prob:.1%}, rev={rev_prob:.1%})")
+                        logger.info(f"      Thesis factor: {thesis_factor:.2f} (quality={thesis_quality:.2f})")
+                        logger.info(f"      When uncertain with decent thesis, HOLD and let trade develop")
+                        best_action = 'HOLD'
+                        best_ev = hold_ev
                 else:
                     logger.info(f"   ⏸️ {best_action} advantage too small ({ev_advantage:.4f}% < {required_advantage:.4f}%) - defaulting to HOLD")
                     logger.info(f"      AI uncertainty: {ai_uncertainty:.2f} (cont={cont_prob:.1%}, rev={rev_prob:.1%})")

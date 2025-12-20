@@ -26,7 +26,7 @@ from src.utils.market_hours import MarketHours
 from src.ai.unified_trading_system import UnifiedTradingSystem
 from src.ai.elite_position_sizer import ElitePositionSizer
 from src.ai.portfolio_state import get_portfolio_state
-from src.utils.trade_journal import log_closed_trade, get_trade_stats
+from src.utils.trade_journal import log_closed_trade, get_trade_stats, log_entry_context, log_exit_context
 
 # ═══════════════════════════════════════════════════════════════════
 # STRUCTURED MODEL OUTPUT BUILDER
@@ -1202,6 +1202,41 @@ async def ai_trade_decision(request: dict):
                                 position_decision.get('reason', 'EV optimization')
                             )
                             
+                            # ═══════════════════════════════════════════════════════════
+                            # LOG EXIT CONTEXT FOR POST-ANALYSIS
+                            # Captures full AI decision context at moment of exit
+                            # ═══════════════════════════════════════════════════════════
+                            try:
+                                current_price = float(request.get('current_price', {}).get('bid', 0))
+                                log_exit_context(
+                                    ticket=pos_ticket,
+                                    symbol=pos_symbol_original,
+                                    action='CLOSE',
+                                    exit_price=current_price,
+                                    profit_dollars=pos_profit,
+                                    profit_pct=pos_profit / account_balance * 100 if account_balance > 0 else 0,
+                                    # AI Decision Context
+                                    ev_hold=position_decision.get('ev_hold', 0),
+                                    ev_close=position_decision.get('ev_close', 0),
+                                    ev_scale_out=position_decision.get('ev_scale_out', 0),
+                                    continuation_prob=position_decision.get('cont_prob', 0) * 100,
+                                    reversal_prob=position_decision.get('rev_prob', 0) * 100,
+                                    thesis_quality=position_decision.get('thesis_quality', 0),
+                                    # Timeframe Trends at Exit
+                                    m15_trend=getattr(context, 'm15_trend', 0.5),
+                                    m30_trend=getattr(context, 'm30_trend', 0.5),
+                                    h1_trend=getattr(context, 'h1_trend', 0.5),
+                                    h4_trend=getattr(context, 'h4_trend', 0.5),
+                                    d1_trend=getattr(context, 'd1_trend', 0.5),
+                                    # Market Conditions
+                                    regime=context.get_market_regime() if hasattr(context, 'get_market_regime') else 'unknown',
+                                    volatility=getattr(context, 'volatility', 0),
+                                    session=session_context.get('session_name', 'unknown') if 'session_context' in dir() else 'unknown',
+                                    exit_reason=position_decision.get('reason', '')
+                                )
+                            except Exception as e:
+                                logger.warning(f"Could not log exit context: {e}")
+                            
                             return {
                                 'action': 'CLOSE',
                                 'symbol': pos_symbol_original,
@@ -1270,6 +1305,38 @@ async def ai_trade_decision(request: dict):
                             # CRITICAL: Round to lot_step for this symbol
                             symbol_lot_step = float(request.get('symbol_info', {}).get('lot_step', 1.0))
                             reduce_lots = max(symbol_lot_step, round(reduce_lots / symbol_lot_step) * symbol_lot_step)
+                            
+                            # ═══════════════════════════════════════════════════════════
+                            # LOG EXIT CONTEXT FOR SCALE_OUT
+                            # ═══════════════════════════════════════════════════════════
+                            try:
+                                current_price = float(request.get('current_price', {}).get('bid', 0))
+                                log_exit_context(
+                                    ticket=pos_ticket,
+                                    symbol=pos_symbol_original,
+                                    action='SCALE_OUT',
+                                    exit_price=current_price,
+                                    profit_dollars=pos_profit,
+                                    profit_pct=pos_profit / account_balance * 100 if account_balance > 0 else 0,
+                                    ev_hold=position_decision.get('ev_hold', 0),
+                                    ev_close=position_decision.get('ev_close', 0),
+                                    ev_scale_out=position_decision.get('ev_scale_out', 0),
+                                    continuation_prob=position_decision.get('cont_prob', 0) * 100,
+                                    reversal_prob=position_decision.get('rev_prob', 0) * 100,
+                                    thesis_quality=position_decision.get('thesis_quality', 0),
+                                    m15_trend=getattr(context, 'm15_trend', 0.5),
+                                    m30_trend=getattr(context, 'm30_trend', 0.5),
+                                    h1_trend=getattr(context, 'h1_trend', 0.5),
+                                    h4_trend=getattr(context, 'h4_trend', 0.5),
+                                    d1_trend=getattr(context, 'd1_trend', 0.5),
+                                    regime=context.get_market_regime() if hasattr(context, 'get_market_regime') else 'unknown',
+                                    volatility=getattr(context, 'volatility', 0),
+                                    session=session_context.get('session_name', 'unknown') if 'session_context' in dir() else 'unknown',
+                                    exit_reason=position_decision.get('reason', ''),
+                                    extra_context={'reduce_lots': reduce_lots}
+                                )
+                            except Exception as e:
+                                logger.warning(f"Could not log scale_out context: {e}")
                             
                             logger.info(f"   📉 Reduce lots: {reduce_lots:.2f}")
                             logger.info(f"   📍 Symbol for EA: {pos_symbol_original}")
@@ -1930,6 +1997,51 @@ async def ai_trade_decision(request: dict):
                     "portfolio_risk_pct": portfolio_risk_pct
                 }
             )
+            
+            # ═══════════════════════════════════════════════════════════════════
+            # LOG ENTRY CONTEXT FOR POST-ANALYSIS
+            # Captures full AI decision context at moment of entry
+            # ═══════════════════════════════════════════════════════════════════
+            try:
+                # Generate a temporary ticket (will be updated when MT5 confirms)
+                import time as time_module
+                temp_ticket = int(time_module.time() * 1000) % 100000000
+                
+                log_entry_context(
+                    ticket=temp_ticket,
+                    symbol=raw_symbol,
+                    direction=final_action,
+                    lots=final_lots,
+                    entry_price=current_price,
+                    stop_loss=stop_loss_price,
+                    take_profit=take_profit_price,
+                    # AI Decision Context
+                    ml_confidence=ml_confidence,
+                    ml_direction=ml_direction,
+                    market_score=market_analysis.get('total_score', 0) if 'market_analysis' in dir() else 0,
+                    setup_type=setup_type if 'setup_type' in dir() else 'UNKNOWN',
+                    thesis_quality=entry_decision.get('thesis_quality', 0) if 'entry_decision' in dir() else 0,
+                    # Timeframe Trends
+                    m15_trend=getattr(context, 'm15_trend', 0.5),
+                    m30_trend=getattr(context, 'm30_trend', 0.5),
+                    h1_trend=getattr(context, 'h1_trend', 0.5),
+                    h4_trend=getattr(context, 'h4_trend', 0.5),
+                    d1_trend=getattr(context, 'd1_trend', 0.5),
+                    # Market Conditions
+                    regime=context.get_market_regime() if hasattr(context, 'get_market_regime') else 'unknown',
+                    volatility=getattr(context, 'volatility', 0),
+                    atr=getattr(context, 'atr', 0),
+                    session=session_context.get('session_name', 'unknown') if 'session_context' in dir() else 'unknown',
+                    # Entry Reasoning
+                    entry_reason=entry_decision.get('reason', '') if 'entry_decision' in dir() else '',
+                    extra_context={
+                        'risk_reward': risk_reward,
+                        'entry_ev': entry_ev,
+                        'htf_alignment': market_analysis.get('htf_alignment', 0) if 'market_analysis' in dir() else 0
+                    }
+                )
+            except Exception as e:
+                logger.warning(f"Could not log entry context: {e}")
             
             # ═══════════════════════════════════════════════════════════════════
             # CRITICAL: Validate stop loss before entry

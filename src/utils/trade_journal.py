@@ -1,13 +1,19 @@
 """
-Persistent Trade Journal
+Persistent Trade Journal with AI Decision Context
 
-Logs all closed trades with full context for post-analysis.
-This allows us to analyze what went wrong with losing trades
-even after the API restarts or market closes.
+Logs all trades with FULL AI context at entry and exit:
+- Market conditions (trends, momentum, volatility)
+- AI reasoning (thesis quality, ML confidence, probabilities)
+- EV calculations (hold vs exit vs scale)
+- Timeframe alignment (M15, M30, H1, H4, D1)
+
+This allows post-analysis of what the AI was thinking
+when it made entry/exit decisions.
 
 Data is stored in:
-- data/trade_journal.csv (all trades)
-- data/trade_journal.json (detailed context per trade)
+- data/trade_journal.csv (summary of all trades)
+- data/trade_journal_details.json (full AI context per trade)
+- data/trade_entries.json (entry context by ticket)
 """
 
 import os
@@ -24,6 +30,7 @@ logger = logging.getLogger(__name__)
 DATA_DIR = os.path.join(os.path.dirname(__file__), '../../data')
 JOURNAL_CSV = os.path.join(DATA_DIR, 'trade_journal.csv')
 JOURNAL_JSON = os.path.join(DATA_DIR, 'trade_journal_details.json')
+ENTRY_CONTEXT_JSON = os.path.join(DATA_DIR, 'trade_entries.json')
 
 # Thread lock for file operations
 _file_lock = threading.Lock()
@@ -275,6 +282,222 @@ def get_trade_stats(days: int = 7) -> Dict:
         'avg_win': sum(float(t.get('net_pnl', 0)) for t in wins) / len(wins) if wins else 0,
         'avg_loss': sum(float(t.get('net_pnl', 0)) for t in losses) / len(losses) if losses else 0
     }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ENTRY CONTEXT LOGGING
+# Captures AI decision context at the moment of entry
+# ═══════════════════════════════════════════════════════════════════
+
+def log_entry_context(
+    ticket: int,
+    symbol: str,
+    direction: str,
+    lots: float,
+    entry_price: float,
+    stop_loss: float,
+    take_profit: float,
+    # AI Decision Context
+    ml_confidence: float = 0,
+    ml_direction: str = '',
+    market_score: float = 0,
+    setup_type: str = '',
+    thesis_quality: float = 0,
+    # Timeframe Trends
+    m15_trend: float = 0.5,
+    m30_trend: float = 0.5,
+    h1_trend: float = 0.5,
+    h4_trend: float = 0.5,
+    d1_trend: float = 0.5,
+    # Market Conditions
+    regime: str = '',
+    volatility: float = 0,
+    atr: float = 0,
+    session: str = '',
+    # Entry Reasoning
+    entry_reason: str = '',
+    extra_context: Dict = None
+):
+    """
+    Log AI decision context at the moment of entry.
+    This is called when a trade is APPROVED, before it's sent to MT5.
+    """
+    with _file_lock:
+        try:
+            _ensure_data_dir()
+            
+            entry_data = {
+                'ticket': ticket,
+                'symbol': symbol,
+                'direction': direction,
+                'lots': lots,
+                'entry_price': entry_price,
+                'stop_loss': stop_loss,
+                'take_profit': take_profit,
+                'entry_time': datetime.now().isoformat(),
+                # AI Decision
+                'ml_confidence': ml_confidence,
+                'ml_direction': ml_direction,
+                'market_score': market_score,
+                'setup_type': setup_type,
+                'thesis_quality': thesis_quality,
+                # Timeframes
+                'trends': {
+                    'm15': m15_trend,
+                    'm30': m30_trend,
+                    'h1': h1_trend,
+                    'h4': h4_trend,
+                    'd1': d1_trend
+                },
+                # Market
+                'regime': regime,
+                'volatility': volatility,
+                'atr': atr,
+                'session': session,
+                'entry_reason': entry_reason,
+                'extra': extra_context or {}
+            }
+            
+            # Load existing entries
+            entries = {}
+            if os.path.exists(ENTRY_CONTEXT_JSON):
+                try:
+                    with open(ENTRY_CONTEXT_JSON, 'r') as f:
+                        entries = json.load(f)
+                except:
+                    entries = {}
+            
+            # Add new entry
+            entries[str(ticket)] = entry_data
+            
+            # Keep only last 500 entries
+            if len(entries) > 500:
+                sorted_tickets = sorted(entries.keys(), key=int, reverse=True)[:500]
+                entries = {k: entries[k] for k in sorted_tickets}
+            
+            # Save
+            with open(ENTRY_CONTEXT_JSON, 'w') as f:
+                json.dump(entries, f, indent=2)
+            
+            logger.info(f"📓 ENTRY LOGGED: #{ticket} {symbol} {direction} {lots}L @ {entry_price}")
+            logger.info(f"   ML: {ml_confidence:.1f}% {ml_direction} | Score: {market_score} | Setup: {setup_type}")
+            logger.info(f"   Trends: M15={m15_trend:.2f} M30={m30_trend:.2f} H1={h1_trend:.2f} H4={h4_trend:.2f} D1={d1_trend:.2f}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to log entry context: {e}")
+            return False
+
+
+# ═══════════════════════════════════════════════════════════════════
+# EXIT CONTEXT LOGGING  
+# Captures AI decision context at the moment of exit
+# ═══════════════════════════════════════════════════════════════════
+
+def log_exit_context(
+    ticket: int,
+    symbol: str,
+    action: str,  # CLOSE, SCALE_OUT, etc.
+    exit_price: float,
+    profit_dollars: float,
+    profit_pct: float,
+    # AI Decision Context
+    ev_hold: float = 0,
+    ev_close: float = 0,
+    ev_scale_out: float = 0,
+    continuation_prob: float = 0,
+    reversal_prob: float = 0,
+    thesis_quality: float = 0,
+    # Timeframe Trends at Exit
+    m15_trend: float = 0.5,
+    m30_trend: float = 0.5,
+    h1_trend: float = 0.5,
+    h4_trend: float = 0.5,
+    d1_trend: float = 0.5,
+    # Market Conditions at Exit
+    regime: str = '',
+    volatility: float = 0,
+    session: str = '',
+    # Exit Reasoning
+    exit_reason: str = '',
+    extra_context: Dict = None
+):
+    """
+    Log AI decision context at the moment of exit.
+    This is called when AI decides to CLOSE or SCALE_OUT.
+    """
+    with _file_lock:
+        try:
+            _ensure_data_dir()
+            
+            # Load entry context if available
+            entry_context = None
+            if os.path.exists(ENTRY_CONTEXT_JSON):
+                try:
+                    with open(ENTRY_CONTEXT_JSON, 'r') as f:
+                        entries = json.load(f)
+                        entry_context = entries.get(str(ticket))
+                except:
+                    pass
+            
+            exit_data = {
+                'ticket': ticket,
+                'symbol': symbol,
+                'action': action,
+                'exit_price': exit_price,
+                'exit_time': datetime.now().isoformat(),
+                'profit_dollars': profit_dollars,
+                'profit_pct': profit_pct,
+                # AI Decision
+                'ev_hold': ev_hold,
+                'ev_close': ev_close,
+                'ev_scale_out': ev_scale_out,
+                'continuation_prob': continuation_prob,
+                'reversal_prob': reversal_prob,
+                'thesis_quality': thesis_quality,
+                # Timeframes at Exit
+                'trends_at_exit': {
+                    'm15': m15_trend,
+                    'm30': m30_trend,
+                    'h1': h1_trend,
+                    'h4': h4_trend,
+                    'd1': d1_trend
+                },
+                # Market at Exit
+                'regime': regime,
+                'volatility': volatility,
+                'session': session,
+                'exit_reason': exit_reason,
+                'extra': extra_context or {},
+                # Entry context for comparison
+                'entry_context': entry_context
+            }
+            
+            # Save to detailed journal
+            _save_trade_details(ticket, exit_data)
+            
+            logger.info(f"📓 EXIT LOGGED: #{ticket} {symbol} {action} @ {exit_price} → ${profit_dollars:.2f}")
+            logger.info(f"   EV: Hold={ev_hold:.2f}% Close={ev_close:.2f}% | Cont={continuation_prob:.0f}% Rev={reversal_prob:.0f}%")
+            logger.info(f"   Trends: M15={m15_trend:.2f} M30={m30_trend:.2f} H1={h1_trend:.2f} H4={h4_trend:.2f} D1={d1_trend:.2f}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to log exit context: {e}")
+            return False
+
+
+def get_entry_context(ticket: int) -> Optional[Dict]:
+    """Get the entry context for a specific trade"""
+    if not os.path.exists(ENTRY_CONTEXT_JSON):
+        return None
+    try:
+        with open(ENTRY_CONTEXT_JSON, 'r') as f:
+            entries = json.load(f)
+            return entries.get(str(ticket))
+    except:
+        return None
 
 
 # Initialize on import

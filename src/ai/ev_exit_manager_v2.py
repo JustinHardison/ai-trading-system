@@ -3513,9 +3513,42 @@ class EVExitManagerV2:
         # PORTFOLIO DRAWDOWN ADJUSTMENT:
         # When portfolio is in drawdown AND position is weak, reduce HOLD EV
         # This makes exit more attractive for weak positions during drawdowns
+        
+        # ═══════════════════════════════════════════════════════════
+        # TARGET EXCEEDED ADJUSTMENT
+        # 
+        # When profit exceeds target, the expected continuation should
+        # be reduced. The market has already given more than expected.
+        # Extended moves tend to retrace - reduce continuation probability.
+        # ═══════════════════════════════════════════════════════════
+        
+        # Calculate target capture ratio early for HOLD EV adjustment
+        target_pct_early = (swing_atr * atr_mult / current_price * 100) if current_price > 0 else 1.0
+        if profit_pct > 0 and target_pct_early > 0:
+            target_capture_early = profit_pct / target_pct_early
+        else:
+            target_capture_early = 0
+        
+        # Adjust continuation probability when target exceeded
+        effective_cont_prob = cont_prob
+        effective_rev_prob = rev_prob
+        if target_capture_early > 1.0 and profit_pct > 0:
+            # Reduce continuation probability proportionally to excess
+            # At 110%: reduce cont by 10%, increase rev by 10%
+            # At 150%: reduce cont by 50%, increase rev by 50%
+            # At 200%: reduce cont by 100% (capped at 50% reduction)
+            excess = target_capture_early - 1.0
+            reduction_factor = min(0.5, excess)  # Cap at 50% reduction
+            
+            effective_cont_prob = cont_prob * (1.0 - reduction_factor)
+            effective_rev_prob = rev_prob + (cont_prob * reduction_factor * 0.5)  # Half goes to reversal
+            
+            logger.info(f"   🎯 TARGET EXCEEDED ({target_capture_early:.1%}): Adjusting probabilities")
+            logger.info(f"      cont: {cont_prob:.1%} → {effective_cont_prob:.1%}, rev: {rev_prob:.1%} → {effective_rev_prob:.1%}")
+        
         ev_hold = (
-            cont_prob * potential_account_gain +
-            rev_prob * (profit_pct - potential_loss) +
+            effective_cont_prob * potential_account_gain +
+            effective_rev_prob * (profit_pct - potential_loss) +
             flat_prob * profit_pct
         ) * (1.0 - leading_indicator_penalty) - profit_protection_premium - drawdown_exit_premium - total_hedge_fund_premium
         

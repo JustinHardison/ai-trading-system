@@ -3964,16 +3964,21 @@ class EVExitManagerV2:
         target_exceeded_bonus = 0.0
         if profit_pct > 0 and target_capture_ratio > 1.0:
             # Target exceeded - boost SCALE_OUT based on how much exceeded
-            # At 150% of target: bonus = 0.5 * profit * 0.5 = 25% of profit added to EV
-            # At 200% of target: bonus = 1.0 * profit * 0.5 = 50% of profit added to EV
-            # At 300% of target: bonus = 2.0 * profit * 0.5 = 100% of profit added to EV
+            # The bonus must be large enough to overcome the HOLD advantage
+            # 
+            # At 110% of target: bonus = 0.1 * profit * 2.0 = 20% of profit
+            # At 150% of target: bonus = 0.5 * profit * 2.0 = 100% of profit
+            # At 200% of target: bonus = 1.0 * profit * 2.0 = 200% of profit (capped)
             excess_ratio = target_capture_ratio - 1.0  # How much over 100%
-            target_exceeded_bonus = excess_ratio * profit_pct * 0.5
+            target_exceeded_bonus = excess_ratio * profit_pct * 2.0
             
             # Also factor in reversal probability - higher reversal = more urgency
             rev_prob = probabilities.get('reversal', 0.3)
             if rev_prob > 0.25:
                 target_exceeded_bonus *= (1.0 + rev_prob)  # Boost by reversal prob
+            
+            # Cap at 150% of profit to prevent extreme values
+            target_exceeded_bonus = min(target_exceeded_bonus, profit_pct * 1.5)
             
             logger.info(f"   🎯 TARGET EXCEEDED ({target_capture_ratio:.1%}): SCALE_OUT bonus +{target_exceeded_bonus:.4f}%")
             logger.info(f"      Market gave {target_capture_ratio:.1%} of target - lock in profits")

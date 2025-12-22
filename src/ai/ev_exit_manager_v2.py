@@ -75,23 +75,35 @@ class EVExitManagerV2:
         
         IMPORTANT: Peak resets when volume decreases (scale-out occurred).
         This prevents false "giveback" calculations after taking profits.
+        Also tracks cumulative realized profits from scale-outs.
         """
         symbol_key = symbol.upper()
         stored_data = self.position_peaks.get(symbol_key, {})
         current_peak = stored_data.get('peak_profit_pct', float('-inf'))
         stored_volume = stored_data.get('volume', 0)
+        realized_profit_pct = stored_data.get('realized_profit_pct', 0.0)
         
         # If volume decreased, a scale-out occurred - reset peak to current
         if current_volume > 0 and stored_volume > 0 and current_volume < stored_volume * 0.95:
             # Volume decreased by more than 5% - scale-out happened
+            # Estimate realized profit from the scale-out (proportional to volume reduction)
+            volume_reduction_pct = (stored_volume - current_volume) / stored_volume
+            # The realized profit is approximately the peak profit * volume reduction
+            estimated_realized = current_peak * volume_reduction_pct
+            new_realized_total = realized_profit_pct + estimated_realized
+            
             logger.info(f"   🔄 SCALE-OUT DETECTED for {symbol_key}: {stored_volume:.1f} → {current_volume:.1f} lots")
-            logger.info(f"      Resetting peak from {current_peak:.3f}% to {profit_pct:.3f}% (profits locked in)")
+            logger.info(f"      Realized ~{estimated_realized:.3f}% from this scale-out")
+            logger.info(f"      Total realized from scale-outs: {new_realized_total:.3f}%")
+            logger.info(f"      Resetting peak from {current_peak:.3f}% to {profit_pct:.3f}%")
+            
             self.position_peaks[symbol_key] = {
                 'peak_profit_pct': profit_pct,
                 'peak_price': current_price,
                 'peak_time': datetime.now().isoformat(),
                 'updated': datetime.now().isoformat(),
-                'volume': current_volume
+                'volume': current_volume,
+                'realized_profit_pct': new_realized_total
             }
             self._save_peaks()
         elif profit_pct > current_peak:
@@ -100,19 +112,31 @@ class EVExitManagerV2:
                 'peak_price': current_price,
                 'peak_time': datetime.now().isoformat(),
                 'updated': datetime.now().isoformat(),
-                'volume': current_volume if current_volume > 0 else stored_volume
+                'volume': current_volume if current_volume > 0 else stored_volume,
+                'realized_profit_pct': realized_profit_pct
             }
             self._save_peaks()
             logger.info(f"   📈 NEW PEAK for {symbol_key}: {profit_pct:.3f}% (saved to disk)")
         elif current_volume > 0 and stored_volume == 0:
             # First time tracking volume - just update volume without changing peak
             self.position_peaks[symbol_key]['volume'] = current_volume
+            self.position_peaks[symbol_key]['realized_profit_pct'] = realized_profit_pct
             self._save_peaks()
     
     def get_peak(self, symbol: str) -> float:
         """Get peak profit for a symbol"""
         symbol_key = symbol.upper()
         return self.position_peaks.get(symbol_key, {}).get('peak_profit_pct', 0.0)
+    
+    def get_realized_profit(self, symbol: str) -> float:
+        """Get cumulative realized profit from scale-outs for a symbol"""
+        symbol_key = symbol.upper()
+        return self.position_peaks.get(symbol_key, {}).get('realized_profit_pct', 0.0)
+    
+    def get_total_trade_profit(self, symbol: str, current_unrealized_pct: float) -> float:
+        """Get total trade profit (realized from scale-outs + current unrealized)"""
+        realized = self.get_realized_profit(symbol)
+        return realized + current_unrealized_pct
     
     def clear_peak(self, symbol: str):
         """Clear peak when position is closed"""
@@ -1456,7 +1480,19 @@ class EVExitManagerV2:
         # Get the (possibly updated) peak
         peak_profit = self.get_peak(symbol)
         
+        # Get realized profit from scale-outs
+        realized_profit_pct = self.get_realized_profit(symbol)
+        total_trade_profit_pct = self.get_total_trade_profit(symbol, profit_pct_of_account)
+        
+        # Log total trade performance (realized + unrealized)
+        if realized_profit_pct > 0:
+            logger.info(f"   💰 TRADE PERFORMANCE for {symbol}:")
+            logger.info(f"      Realized (from scale-outs): {realized_profit_pct:.3f}%")
+            logger.info(f"      Unrealized (current): {profit_pct_of_account:.3f}%")
+            logger.info(f"      TOTAL TRADE PROFIT: {total_trade_profit_pct:.3f}%")
+        
         # Calculate giveback (how much we've given back from peak)
+        # This is now relative to the CURRENT position's peak, not the pre-scale-out peak
         if peak_profit > 0:
             giveback = (peak_profit - profit_pct_of_account) / peak_profit
         else:
@@ -1470,6 +1506,8 @@ class EVExitManagerV2:
             'giveback': giveback,
             'account_balance': account_balance,
             'is_winning': current_profit > 0,
+            'realized_profit_pct': realized_profit_pct,  # Locked-in profits from scale-outs
+            'total_trade_profit_pct': total_trade_profit_pct,  # Total: realized + unrealized
         }
     
     def _calculate_probabilities(self, market_data: Dict, is_buy: bool, profit_metrics: Dict, setup_type: str = 'DAY') -> Dict:

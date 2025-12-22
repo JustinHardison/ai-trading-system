@@ -737,6 +737,16 @@ class EVExitManagerV2:
         d1_trend = market_data['d1_trend']
         profit_pct = profit_metrics['profit_pct']
         
+        # Add ML direction and position info to probabilities for decision logic
+        probabilities['ml_direction'] = ml_direction
+        probabilities['position_direction'] = 'BUY' if is_buy else 'SELL'
+        
+        # Calculate position age percentage (vs expected duration)
+        position_age_minutes = getattr(context, 'position_age_minutes', 0)
+        expected_duration = self.SETUP_CONFIG.get(setup_type, {}).get('expected_duration', 2880)
+        position_age_pct = (position_age_minutes / expected_duration * 100) if expected_duration > 0 else 0
+        probabilities['position_age_pct'] = position_age_pct
+        
         # Log ML state
         if is_buy and ml_direction == 'SELL':
             logger.info(f"   📊 ML State: Position BUY, ML says SELL @ {ml_confidence:.1f}% (factored into EV)")
@@ -1092,6 +1102,38 @@ class EVExitManagerV2:
                 elif thesis_quality < 0.2 and current_profit_pct < 0:
                     logger.info(f"   ⚠️ WEAK THESIS ({thesis_quality:.2f}) + LOSING → allowing {best_action}")
                     logger.info(f"      Thesis too weak to justify holding a losing position")
+                # ═══════════════════════════════════════════════════════════
+                # OVERDUE + ML DISAGREES OVERRIDE
+                # 
+                # When position is overdue (>100% of expected time) AND ML
+                # disagrees with position direction, lower the threshold.
+                # The position has had time to develop but ML is signaling exit.
+                # ═══════════════════════════════════════════════════════════
+                elif current_profit_pct > 0 and ev_advantage > 0:
+                    # Check if position is overdue and ML disagrees
+                    position_age_pct = probabilities.get('position_age_pct', 0)
+                    ml_direction = probabilities.get('ml_direction', 'HOLD')
+                    position_direction = probabilities.get('position_direction', 'BUY')
+                    ml_disagrees = (ml_direction == 'SELL' and position_direction == 'BUY') or \
+                                   (ml_direction == 'BUY' and position_direction == 'SELL')
+                    
+                    if position_age_pct > 100 and ml_disagrees:
+                        # Overdue + ML disagrees = lower threshold (0.10% instead of 0.15-0.25%)
+                        overdue_threshold = MIN_EXIT_ADVANTAGE * 0.67  # 0.10% threshold
+                        if ev_advantage >= overdue_threshold:
+                            logger.warning(f"   ⏰ OVERDUE ({position_age_pct:.0f}%) + ML DISAGREES → allowing {best_action}")
+                            logger.info(f"      Position has had time to develop, ML signals exit")
+                        else:
+                            logger.info(f"   ⏸️ {best_action} advantage too small ({ev_advantage:.4f}% < {required_advantage:.4f}%) - defaulting to HOLD")
+                            best_action = 'HOLD'
+                            best_ev = hold_ev
+                    else:
+                        logger.info(f"   ⏸️ {best_action} advantage too small ({ev_advantage:.4f}% < {required_advantage:.4f}%) - defaulting to HOLD")
+                        logger.info(f"      AI uncertainty: {ai_uncertainty:.2f} (cont={cont_prob:.1%}, rev={rev_prob:.1%})")
+                        logger.info(f"      Thesis factor: {thesis_factor:.2f} (quality={thesis_quality:.2f})")
+                        logger.info(f"      When uncertain with decent thesis, HOLD and let trade develop")
+                        best_action = 'HOLD'
+                        best_ev = hold_ev
                 # ═══════════════════════════════════════════════════════════
                 # HEDGE FUND WEEKEND RISK OVERRIDE
                 # 

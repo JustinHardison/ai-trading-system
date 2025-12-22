@@ -1359,13 +1359,45 @@ class EVExitManagerV2:
         logger.info(f"   📊 Profit: ${current_profit:.2f} = {profit_pct_of_account:.3f}% of account")
         logger.info(f"   📊 Price move: {price_move_pct:.2f}%")
         
-        # Track peak profit (as % of account)
-        if symbol not in self.position_peaks:
-            self.position_peaks[symbol] = profit_pct_of_account
-        else:
-            self.position_peaks[symbol] = max(self.position_peaks[symbol], profit_pct_of_account)
+        # Track peak profit (as % of account) - USE PERSISTENT STORAGE
+        symbol_key = symbol.upper()
         
-        peak_profit = self.position_peaks[symbol]
+        # Get position age to detect stale peak tracking
+        position_age_minutes = getattr(context, 'position_age_minutes', 0)
+        
+        # Check if we have a stored peak with timestamp
+        stored_peak_data = self.position_peaks.get(symbol_key, {})
+        if isinstance(stored_peak_data, dict):
+            stored_peak = stored_peak_data.get('peak_profit_pct', 0)
+            peak_time_str = stored_peak_data.get('peak_time', '')
+        else:
+            # Legacy format: just a number
+            stored_peak = stored_peak_data if isinstance(stored_peak_data, (int, float)) else 0
+            peak_time_str = ''
+        
+        # WARNING: Detect if position is older than our peak tracking
+        # If position has been open for days but our peak was just set today,
+        # we may have missed the true peak
+        if position_age_minutes > 1440 and peak_time_str:  # Position > 24 hours old
+            try:
+                from datetime import datetime
+                peak_time = datetime.fromisoformat(peak_time_str)
+                peak_age_minutes = (datetime.now() - peak_time).total_seconds() / 60
+                
+                # If peak was set much more recently than position was opened,
+                # we likely missed the true peak (API wasn't running)
+                if peak_age_minutes < position_age_minutes * 0.5:  # Peak set in last half of position life
+                    logger.warning(f"   ⚠️ STALE PEAK WARNING: Position is {position_age_minutes:.0f} min old but peak was set {peak_age_minutes:.0f} min ago")
+                    logger.warning(f"      True peak may have been HIGHER than tracked {stored_peak:.3f}%")
+                    logger.warning(f"      Consider: Current profit {profit_pct_of_account:.3f}% may be a GIVEBACK from untracked peak")
+            except:
+                pass
+        
+        # Update peak using persistent method
+        self.update_peak(symbol, profit_pct_of_account, current_price)
+        
+        # Get the (possibly updated) peak
+        peak_profit = self.get_peak(symbol)
         
         # Calculate giveback (how much we've given back from peak)
         if peak_profit > 0:

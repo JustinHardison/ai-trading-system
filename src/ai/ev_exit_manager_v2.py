@@ -70,20 +70,44 @@ class EVExitManagerV2:
         except Exception as e:
             logger.warning(f"Could not save peaks file: {e}")
     
-    def update_peak(self, symbol: str, profit_pct: float, current_price: float = 0):
-        """Update peak profit for a symbol and persist to file"""
-        symbol_key = symbol.upper()
-        current_peak = self.position_peaks.get(symbol_key, {}).get('peak_profit_pct', float('-inf'))
+    def update_peak(self, symbol: str, profit_pct: float, current_price: float = 0, current_volume: float = 0):
+        """Update peak profit for a symbol and persist to file
         
-        if profit_pct > current_peak:
+        IMPORTANT: Peak resets when volume decreases (scale-out occurred).
+        This prevents false "giveback" calculations after taking profits.
+        """
+        symbol_key = symbol.upper()
+        stored_data = self.position_peaks.get(symbol_key, {})
+        current_peak = stored_data.get('peak_profit_pct', float('-inf'))
+        stored_volume = stored_data.get('volume', 0)
+        
+        # If volume decreased, a scale-out occurred - reset peak to current
+        if current_volume > 0 and stored_volume > 0 and current_volume < stored_volume * 0.95:
+            # Volume decreased by more than 5% - scale-out happened
+            logger.info(f"   🔄 SCALE-OUT DETECTED for {symbol_key}: {stored_volume:.1f} → {current_volume:.1f} lots")
+            logger.info(f"      Resetting peak from {current_peak:.3f}% to {profit_pct:.3f}% (profits locked in)")
             self.position_peaks[symbol_key] = {
                 'peak_profit_pct': profit_pct,
                 'peak_price': current_price,
                 'peak_time': datetime.now().isoformat(),
-                'updated': datetime.now().isoformat()
+                'updated': datetime.now().isoformat(),
+                'volume': current_volume
+            }
+            self._save_peaks()
+        elif profit_pct > current_peak:
+            self.position_peaks[symbol_key] = {
+                'peak_profit_pct': profit_pct,
+                'peak_price': current_price,
+                'peak_time': datetime.now().isoformat(),
+                'updated': datetime.now().isoformat(),
+                'volume': current_volume if current_volume > 0 else stored_volume
             }
             self._save_peaks()
             logger.info(f"   📈 NEW PEAK for {symbol_key}: {profit_pct:.3f}% (saved to disk)")
+        elif current_volume > 0 and stored_volume == 0:
+            # First time tracking volume - just update volume without changing peak
+            self.position_peaks[symbol_key]['volume'] = current_volume
+            self._save_peaks()
     
     def get_peak(self, symbol: str) -> float:
         """Get peak profit for a symbol"""
@@ -1421,9 +1445,13 @@ class EVExitManagerV2:
         logger.info(f"   📊 Profit: ${current_profit:.2f} = {profit_pct_of_account:.3f}% of account")
         logger.info(f"   📊 Price move: {price_move_pct:.2f}%")
         
+        # Get current position volume for scale-out detection
+        current_volume = getattr(context, 'position_volume', 0)
+        
         # Track peak profit (as % of account) - USE PERSISTENT STORAGE
         # ONLY use actual observed profit - NO estimation, NO guessing
-        self.update_peak(symbol, profit_pct_of_account, current_price)
+        # Pass volume to detect scale-outs and reset peak appropriately
+        self.update_peak(symbol, profit_pct_of_account, current_price, current_volume)
         
         # Get the (possibly updated) peak
         peak_profit = self.get_peak(symbol)

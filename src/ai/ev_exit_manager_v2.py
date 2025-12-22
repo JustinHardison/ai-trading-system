@@ -3889,6 +3889,36 @@ class EVExitManagerV2:
             scale_out_premature_penalty = capture_shortfall * thesis_strength * patience_penalty * 5  # Half of CLOSE penalty
             logger.info(f"   ⏳ SCALE_OUT premature penalty: {scale_out_premature_penalty:.4f}%")
         
+        # ═══════════════════════════════════════════════════════════
+        # TARGET EXCEEDED BONUS - AI-DRIVEN PROFIT TAKING
+        # 
+        # When target is significantly exceeded (>100%), the AI should
+        # strongly favor taking profits. The market has given MORE than
+        # expected - lock it in before it reverses.
+        # 
+        # This is based on live market data:
+        # - target_capture_ratio from actual profit vs ATR-based target
+        # - reversal probability from ML and HTF analysis
+        # - thesis quality from market structure
+        # ═══════════════════════════════════════════════════════════
+        
+        target_exceeded_bonus = 0.0
+        if profit_pct > 0 and target_capture_ratio > 1.0:
+            # Target exceeded - boost SCALE_OUT based on how much exceeded
+            # At 150% of target: bonus = 0.5 * profit * 0.5 = 25% of profit added to EV
+            # At 200% of target: bonus = 1.0 * profit * 0.5 = 50% of profit added to EV
+            # At 300% of target: bonus = 2.0 * profit * 0.5 = 100% of profit added to EV
+            excess_ratio = target_capture_ratio - 1.0  # How much over 100%
+            target_exceeded_bonus = excess_ratio * profit_pct * 0.5
+            
+            # Also factor in reversal probability - higher reversal = more urgency
+            rev_prob = probabilities.get('reversal', 0.3)
+            if rev_prob > 0.25:
+                target_exceeded_bonus *= (1.0 + rev_prob)  # Boost by reversal prob
+            
+            logger.info(f"   🎯 TARGET EXCEEDED ({target_capture_ratio:.1%}): SCALE_OUT bonus +{target_exceeded_bonus:.4f}%")
+            logger.info(f"      Market gave {target_capture_ratio:.1%} of target - lock in profits")
+        
         if profit_pct > 0:
             # Profitable: bonus based on locking in actual profit
             # BUT: Only if we've captured meaningful portion of target
@@ -3997,8 +4027,9 @@ class EVExitManagerV2:
         weekend_scale_boost_50 = weekend_close_boost * 0.50
         
         # Apply premature exit penalty to SCALE_OUT EV (reduces attractiveness of early exits)
-        ev_scale_out_25 = ((profit_pct * 0.25 - total_cost_pct * 0.25) + 0.75 * ev_hold + risk_reduction_bonus * 0.25 + exhaustion_bonus * 0.25 + profit_protection_premium * 0.25 + drawdown_scale_boost + news_scale_boost * 0.25 + daily_profit_boost * 0.25 - scale_out_premature_penalty * 0.25 + weekend_scale_boost_25) * session_scale_out_adj
-        ev_scale_out_50 = ((profit_pct * 0.50 - total_cost_pct * 0.50) + 0.50 * ev_hold + risk_reduction_bonus * 0.50 + exhaustion_bonus * 0.50 + profit_protection_premium * 0.50 + drawdown_scale_boost * 2 + news_scale_boost * 0.50 + daily_profit_boost * 0.50 - scale_out_premature_penalty * 0.50 + weekend_scale_boost_50) * session_scale_out_adj
+        # Add target_exceeded_bonus when profit exceeds target significantly
+        ev_scale_out_25 = ((profit_pct * 0.25 - total_cost_pct * 0.25) + 0.75 * ev_hold + risk_reduction_bonus * 0.25 + exhaustion_bonus * 0.25 + profit_protection_premium * 0.25 + drawdown_scale_boost + news_scale_boost * 0.25 + daily_profit_boost * 0.25 - scale_out_premature_penalty * 0.25 + weekend_scale_boost_25 + target_exceeded_bonus * 0.25) * session_scale_out_adj
+        ev_scale_out_50 = ((profit_pct * 0.50 - total_cost_pct * 0.50) + 0.50 * ev_hold + risk_reduction_bonus * 0.50 + exhaustion_bonus * 0.50 + profit_protection_premium * 0.50 + drawdown_scale_boost * 2 + news_scale_boost * 0.50 + daily_profit_boost * 0.50 - scale_out_premature_penalty * 0.50 + weekend_scale_boost_50 + target_exceeded_bonus * 0.50) * session_scale_out_adj
         
         if profit_protection_premium > 0:
             logger.info(f"   💰 Profit Protection: SCALE_OUT boosted by {profit_protection_premium * 0.25:.4f}% (25%) / {profit_protection_premium * 0.50:.4f}% (50%)")

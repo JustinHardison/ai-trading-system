@@ -1067,24 +1067,24 @@ class EVExitManagerV2:
             required_advantage = MIN_EXIT_ADVANTAGE * (1.0 + ai_uncertainty) * thesis_factor
             
             if ev_advantage < required_advantage:
-                # Exception: If thesis is VERY weak (< 0.2) and position is losing, allow exit
+                # Get target_capture_ratio from EVs dict (calculated in _calculate_evs)
                 current_profit_pct = probabilities.get('current_profit_pct', 0)
-                ai_target = probabilities.get('ai_target', 1.0)
-                target_capture = (current_profit_pct / ai_target * 100) if ai_target > 0 and current_profit_pct > 0 else 0
+                target_capture_ratio = evs.get('target_capture_ratio', 0)
+                target_capture_pct = target_capture_ratio * 100  # Convert to percentage
                 
                 # ═══════════════════════════════════════════════════════════
                 # TARGET EXCEEDED OVERRIDE - TAKE PROFITS
                 # 
-                # When profit exceeds target by 100%+, the market has given
+                # When profit exceeds target by 50%+, the market has given
                 # MORE than expected. Lock it in - this is not uncertainty,
                 # this is profit-taking based on live market data.
                 # ═══════════════════════════════════════════════════════════
-                if target_capture > 150 and current_profit_pct > 0:
+                if target_capture_ratio > 1.5 and current_profit_pct > 0:
                     # Target exceeded by 50%+ - allow SCALE_OUT with minimal threshold
                     target_threshold = MIN_EXIT_ADVANTAGE * 0.1  # Very low threshold (0.015%)
                     if ev_advantage >= target_threshold or ev_advantage > 0:
-                        logger.warning(f"   🎯 TARGET EXCEEDED ({target_capture:.0f}%) → allowing {best_action}")
-                        logger.info(f"      Market gave {target_capture:.0f}% of target - TAKE PROFITS")
+                        logger.warning(f"   🎯 TARGET EXCEEDED ({target_capture_pct:.0f}%) → allowing {best_action}")
+                        logger.info(f"      Market gave {target_capture_pct:.0f}% of target - TAKE PROFITS")
                     else:
                         logger.info(f"   ⏸️ {best_action} advantage too small even with target exceeded")
                         best_action = 'HOLD'
@@ -4294,6 +4294,7 @@ class EVExitManagerV2:
             'CLOSE': ev_close,
             'SCALE_IN': ev_scale_in,
             'DCA': ev_dca,
+            'target_capture_ratio': target_capture_ratio,  # For profit-taking decisions
         }
     
     def _calculate_target(self, market_data: Dict, current_profit_pct: float, is_buy: bool) -> float:

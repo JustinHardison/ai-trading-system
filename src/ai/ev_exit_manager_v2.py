@@ -3606,15 +3606,19 @@ class EVExitManagerV2:
             # Reduce HOLD EV when target exceeded
             # The penalty should be significant enough to make SCALE_OUT attractive
             # 
-            # At 110% of target: penalty = 0.1 * profit * 0.8 = 8% of profit
-            # At 150% of target: penalty = 0.5 * profit * 0.8 = 40% of profit
-            # At 200% of target: penalty = 1.0 * profit * 0.8 = 80% of profit
+            # Base penalty: excess_ratio * profit * 1.5
+            # At 110% of target: penalty = 0.1 * profit * 1.5 = 15% of profit
+            # At 150% of target: penalty = 0.5 * profit * 1.5 = 75% of profit
+            # At 200% of target: penalty = 1.0 * profit * 1.5 = 150% of profit (capped)
             excess_ratio = target_capture_ratio - 1.0
-            target_exceeded_hold_penalty = excess_ratio * profit_pct * 0.8
+            target_exceeded_hold_penalty = excess_ratio * profit_pct * 1.5
             
             # Also factor in reversal probability - higher reversal = more penalty
             if rev_prob > 0.25:
                 target_exceeded_hold_penalty *= (1.0 + rev_prob)
+            
+            # Cap penalty at 100% of profit (don't make HOLD negative)
+            target_exceeded_hold_penalty = min(target_exceeded_hold_penalty, profit_pct * 0.9)
             
             logger.info(f"   🎯 TARGET EXCEEDED ({target_capture_ratio:.1%}): HOLD penalty -{target_exceeded_hold_penalty:.4f}%")
             logger.info(f"      Market gave {target_capture_ratio:.1%} of target - reduce HOLD attractiveness")

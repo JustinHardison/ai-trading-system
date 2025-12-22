@@ -1069,7 +1069,27 @@ class EVExitManagerV2:
             if ev_advantage < required_advantage:
                 # Exception: If thesis is VERY weak (< 0.2) and position is losing, allow exit
                 current_profit_pct = probabilities.get('current_profit_pct', 0)
-                if thesis_quality < 0.2 and current_profit_pct < 0:
+                ai_target = probabilities.get('ai_target', 1.0)
+                target_capture = (current_profit_pct / ai_target * 100) if ai_target > 0 and current_profit_pct > 0 else 0
+                
+                # ═══════════════════════════════════════════════════════════
+                # TARGET EXCEEDED OVERRIDE - TAKE PROFITS
+                # 
+                # When profit exceeds target by 100%+, the market has given
+                # MORE than expected. Lock it in - this is not uncertainty,
+                # this is profit-taking based on live market data.
+                # ═══════════════════════════════════════════════════════════
+                if target_capture > 150 and current_profit_pct > 0:
+                    # Target exceeded by 50%+ - allow SCALE_OUT with minimal threshold
+                    target_threshold = MIN_EXIT_ADVANTAGE * 0.1  # Very low threshold (0.015%)
+                    if ev_advantage >= target_threshold or ev_advantage > 0:
+                        logger.warning(f"   🎯 TARGET EXCEEDED ({target_capture:.0f}%) → allowing {best_action}")
+                        logger.info(f"      Market gave {target_capture:.0f}% of target - TAKE PROFITS")
+                    else:
+                        logger.info(f"   ⏸️ {best_action} advantage too small even with target exceeded")
+                        best_action = 'HOLD'
+                        best_ev = hold_ev
+                elif thesis_quality < 0.2 and current_profit_pct < 0:
                     logger.info(f"   ⚠️ WEAK THESIS ({thesis_quality:.2f}) + LOSING → allowing {best_action}")
                     logger.info(f"      Thesis too weak to justify holding a losing position")
                 # ═══════════════════════════════════════════════════════════

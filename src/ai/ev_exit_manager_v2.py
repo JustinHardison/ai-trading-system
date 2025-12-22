@@ -3604,11 +3604,13 @@ class EVExitManagerV2:
         target_exceeded_hold_penalty = 0.0
         if target_capture_ratio > 1.0 and profit_pct > 0:
             # Reduce HOLD EV when target exceeded
-            # At 150% of target: penalty = 0.5 * profit * 0.3 = 15% of profit
-            # At 200% of target: penalty = 1.0 * profit * 0.3 = 30% of profit
-            # At 300% of target: penalty = 2.0 * profit * 0.3 = 60% of profit
+            # The penalty should be significant enough to make SCALE_OUT attractive
+            # 
+            # At 110% of target: penalty = 0.1 * profit * 0.8 = 8% of profit
+            # At 150% of target: penalty = 0.5 * profit * 0.8 = 40% of profit
+            # At 200% of target: penalty = 1.0 * profit * 0.8 = 80% of profit
             excess_ratio = target_capture_ratio - 1.0
-            target_exceeded_hold_penalty = excess_ratio * profit_pct * 0.3
+            target_exceeded_hold_penalty = excess_ratio * profit_pct * 0.8
             
             # Also factor in reversal probability - higher reversal = more penalty
             if rev_prob > 0.25:

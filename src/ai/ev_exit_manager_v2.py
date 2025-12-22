@@ -1378,6 +1378,9 @@ class EVExitManagerV2:
         # WARNING: Detect if position is older than our peak tracking
         # If position has been open for days but our peak was just set today,
         # we may have missed the true peak
+        stale_peak_detected = False
+        estimated_true_peak = stored_peak
+        
         if position_age_minutes > 1440 and peak_time_str:  # Position > 24 hours old
             try:
                 from datetime import datetime
@@ -1387,14 +1390,55 @@ class EVExitManagerV2:
                 # If peak was set much more recently than position was opened,
                 # we likely missed the true peak (API wasn't running)
                 if peak_age_minutes < position_age_minutes * 0.5:  # Peak set in last half of position life
+                    stale_peak_detected = True
                     logger.warning(f"   ⚠️ STALE PEAK WARNING: Position is {position_age_minutes:.0f} min old but peak was set {peak_age_minutes:.0f} min ago")
-                    logger.warning(f"      True peak may have been HIGHER than tracked {stored_peak:.3f}%")
-                    logger.warning(f"      Consider: Current profit {profit_pct_of_account:.3f}% may be a GIVEBACK from untracked peak")
-            except:
-                pass
+                    
+                    # ═══════════════════════════════════════════════════════════
+                    # PROTECTIVE PEAK ESTIMATION
+                    # 
+                    # When we detect stale peak, assume the true peak was HIGHER
+                    # than current profit. Use a conservative estimate based on:
+                    # - Current profit (we know it was at least this high recently)
+                    # - Position age (older = more likely to have had bigger swings)
+                    # - Symbol volatility (gold/indices swing more than forex)
+                    # 
+                    # This makes the AI more protective of current profits when
+                    # we don't have accurate peak data.
+                    # ═══════════════════════════════════════════════════════════
+                    
+                    # Estimate: true peak was at least 1.5x-2x current profit for old positions
+                    # This is conservative - better to protect too much than too little
+                    age_factor = min(2.0, 1.0 + (position_age_minutes / 10000))  # 1.0 to 2.0 based on age
+                    
+                    # For volatile symbols (gold, indices), assume bigger swings
+                    symbol_lower = symbol.lower()
+                    if 'xau' in symbol_lower or 'gold' in symbol_lower:
+                        volatility_mult = 1.5  # Gold swings a lot
+                    elif any(idx in symbol_lower for idx in ['us30', 'us100', 'us500']):
+                        volatility_mult = 1.3  # Indices swing moderately
+                    else:
+                        volatility_mult = 1.1  # Forex swings less
+                    
+                    # Estimated true peak = current profit × age factor × volatility
+                    # But at minimum, use current profit (don't go lower)
+                    if profit_pct_of_account > 0:
+                        estimated_true_peak = max(
+                            stored_peak,
+                            profit_pct_of_account * age_factor * volatility_mult
+                        )
+                        logger.warning(f"      🛡️ PROTECTIVE: Estimating true peak at {estimated_true_peak:.3f}% (vs tracked {stored_peak:.3f}%)")
+                        logger.warning(f"         Age factor: {age_factor:.2f}x, Volatility mult: {volatility_mult:.1f}x")
+                        
+                        # Update the peak to the estimated value
+                        self.update_peak(symbol, estimated_true_peak, current_price)
+                    else:
+                        logger.warning(f"      Position in loss - no peak estimation needed")
+            except Exception as e:
+                logger.warning(f"      Peak estimation error: {e}")
         
-        # Update peak using persistent method
-        self.update_peak(symbol, profit_pct_of_account, current_price)
+        # Update peak using persistent method (if not already updated above)
+        if not stale_peak_detected:
+            self.update_peak(symbol, profit_pct_of_account, current_price)
         
         # Get the (possibly updated) peak
         peak_profit = self.get_peak(symbol)

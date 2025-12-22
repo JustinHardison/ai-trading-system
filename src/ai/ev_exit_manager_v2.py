@@ -3587,6 +3587,39 @@ class EVExitManagerV2:
         else:
             target_capture_ratio = 0  # No penalty for losses (we want to cut those)
         
+        # ═══════════════════════════════════════════════════════════
+        # TARGET EXCEEDED PENALTY FOR HOLD EV
+        # 
+        # When profit significantly exceeds target (>100%), the expected
+        # continuation gain should be reduced. The market has already
+        # given more than expected - probability of further gains decreases.
+        # 
+        # This is AI-driven based on:
+        # - target_capture_ratio from actual profit vs ATR-based target
+        # - The more we exceed target, the lower the expected continuation
+        # 
+        # This makes SCALE_OUT more attractive when target is exceeded.
+        # ═══════════════════════════════════════════════════════════
+        
+        target_exceeded_hold_penalty = 0.0
+        if target_capture_ratio > 1.0 and profit_pct > 0:
+            # Reduce HOLD EV when target exceeded
+            # At 150% of target: penalty = 0.5 * profit * 0.3 = 15% of profit
+            # At 200% of target: penalty = 1.0 * profit * 0.3 = 30% of profit
+            # At 300% of target: penalty = 2.0 * profit * 0.3 = 60% of profit
+            excess_ratio = target_capture_ratio - 1.0
+            target_exceeded_hold_penalty = excess_ratio * profit_pct * 0.3
+            
+            # Also factor in reversal probability - higher reversal = more penalty
+            if rev_prob > 0.25:
+                target_exceeded_hold_penalty *= (1.0 + rev_prob)
+            
+            logger.info(f"   🎯 TARGET EXCEEDED ({target_capture_ratio:.1%}): HOLD penalty -{target_exceeded_hold_penalty:.4f}%")
+            logger.info(f"      Market gave {target_capture_ratio:.1%} of target - reduce HOLD attractiveness")
+            
+            # Apply penalty to ev_hold
+            ev_hold -= target_exceeded_hold_penalty
+        
         # Premature exit penalty: HIGH when thesis strong AND far from target
         # Formula: penalty = thesis_strength * (1 - target_capture_ratio) * base_penalty
         # 

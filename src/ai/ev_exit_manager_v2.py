@@ -1104,30 +1104,6 @@ class EVExitManagerV2:
         
         MIN_EXIT_ADVANTAGE = 0.15  # 0.15% minimum advantage over HOLD for ANY exit
         
-        # ═══════════════════════════════════════════════════════════
-        # MINIMUM POSITION AGE CHECK - CRITICAL FIX
-        # 
-        # Prevents immediate exit on brand new positions. This fixes the
-        # US500 disaster where positions were opened and immediately closed
-        # because thesis_quality was 0.1 (position direction mismatched AI signal).
-        # 
-        # New positions need time to develop. Even if thesis looks weak,
-        # give the position at least 5 minutes before considering exit.
-        # This prevents:
-        # 1. Churning from open-close-open-close cycles
-        # 2. Losses from spread/commission on immediate exits
-        # 3. False thesis readings on brand new positions
-        # ═══════════════════════════════════════════════════════════
-        
-        position_age_minutes = getattr(context, 'position_age_minutes', 0)
-        MIN_POSITION_AGE_MINUTES = 5  # Minimum 5 minutes before any exit
-        
-        if position_age_minutes < MIN_POSITION_AGE_MINUTES and best_action in ['CLOSE', 'SCALE_OUT_25', 'SCALE_OUT_50']:
-            logger.warning(f"   ⏳ POSITION TOO NEW ({position_age_minutes:.0f} min < {MIN_POSITION_AGE_MINUTES} min) - forcing HOLD")
-            logger.info(f"      New positions need time to develop. Blocking {best_action}.")
-            best_action = 'HOLD'
-            best_ev = hold_ev
-        
         if best_action in ['CLOSE', 'SCALE_OUT_25', 'SCALE_OUT_50']:
             ev_advantage = best_ev - hold_ev
             
@@ -2852,131 +2828,36 @@ class EVExitManagerV2:
         d1_trend = market_data['d1_trend']
         
         # ═══════════════════════════════════════════════════════════
-        # SETUP-APPROPRIATE THESIS CHECK
+        # AI-DRIVEN THESIS QUALITY - USE CONTINUOUS SCORING
         # 
-        # Different setup types use different timeframes for thesis:
-        # - SWING: D1 primary, H4 secondary
-        # - DAY: H4 primary, H1 secondary  
-        # - SCALP: H1 primary, M30/M15 secondary
+        # CRITICAL FIX: Use the thesis_quality from _calculate_probabilities
+        # which uses CONTINUOUS AI-driven scoring (ML + HTF alignment).
         # 
-        # This ensures SCALPs aren't penalized for D1 not aligning
-        # when they only need H1/M30 alignment to be valid.
+        # The old threshold-based logic (0.48, 0.52, 0.55) was causing
+        # the US500 disaster: positions opened in wrong direction got
+        # thesis_quality=0.1 and were immediately closed.
+        # 
+        # The AI-driven thesis_quality from probabilities already considers:
+        # - ML factor (0-1 based on confidence and direction agreement)
+        # - HTF alignment (0-1 based on trend support for position)
+        # - Combined into continuous 0-1 score
+        # 
+        # This ensures entry and exit use the SAME AI-driven logic.
         # ═══════════════════════════════════════════════════════════
         
-        # Get M15/M30 trends for SCALP thesis
-        m15_trend = market_data.get('m15_trend', 0.5)
-        m30_trend = market_data.get('m30_trend', 0.5)
+        # Get the AI-driven thesis quality from probabilities
+        # This was calculated in _calculate_probabilities using continuous scoring
+        thesis_quality = probabilities.get('thesis_quality', 0.5)
         
         # Get profit state for context
         profit_pct = profit_metrics['profit_pct']
         is_profitable = profit_pct > 0.1  # Meaningful profit
         
-        # Determine thesis based on setup type
-        if setup_type == 'SCALP':
-            # SCALP: H1 is primary, M30/M15 are secondary
-            # D1/H4 are nice-to-have but NOT required
-            if is_buy:
-                primary_supports = h1_trend > 0.48
-                primary_strongly_supports = h1_trend > 0.55
-                secondary_supports = m30_trend > 0.48 or m15_trend > 0.48
-                tertiary_supports = h4_trend > 0.48  # Bonus, not required
-            else:
-                primary_supports = h1_trend < 0.52
-                primary_strongly_supports = h1_trend < 0.45
-                secondary_supports = m30_trend < 0.52 or m15_trend < 0.52
-                tertiary_supports = h4_trend < 0.52
-            
-            tf_labels = ('H1', 'M30/M15', 'H4')
-            tf_values = (h1_trend, m30_trend, h4_trend)
-            
-        elif setup_type == 'DAY':
-            # DAY: H4 is primary, H1 is secondary, D1 is bonus
-            if is_buy:
-                primary_supports = h4_trend > 0.48
-                primary_strongly_supports = h4_trend > 0.55
-                secondary_supports = h1_trend > 0.48
-                tertiary_supports = d1_trend > 0.48
-            else:
-                primary_supports = h4_trend < 0.52
-                primary_strongly_supports = h4_trend < 0.45
-                secondary_supports = h1_trend < 0.52
-                tertiary_supports = d1_trend < 0.52
-            
-            tf_labels = ('H4', 'H1', 'D1')
-            tf_values = (h4_trend, h1_trend, d1_trend)
-            
-        else:  # SWING
-            # SWING: D1 is primary, H4 is secondary
-            if is_buy:
-                primary_supports = d1_trend > 0.48
-                primary_strongly_supports = d1_trend > 0.55
-                secondary_supports = h4_trend > 0.48
-                tertiary_supports = h1_trend > 0.48
-            else:
-                primary_supports = d1_trend < 0.52
-                primary_strongly_supports = d1_trend < 0.45
-                secondary_supports = h4_trend < 0.52
-                tertiary_supports = h1_trend < 0.52
-            
-            tf_labels = ('D1', 'H4', 'H1')
-            tf_values = (d1_trend, h4_trend, h1_trend)
-        
-        # ML support check
-        ml_strongly_supports = (ml_direction == ('BUY' if is_buy else 'SELL') and ml_confidence > 60)
+        # Log the AI-driven thesis quality
         ml_supports = ml_direction in [('BUY' if is_buy else 'SELL'), 'HOLD']
-        
-        # Count confirmations for the appropriate timeframes
-        htf_support_count = sum([primary_supports, secondary_supports, tertiary_supports])
-        
-        # ═══════════════════════════════════════════════════════════
-        # SMART EXIT LOGIC: Hierarchical with Early Warnings
-        # 
-        # Primary TF sets the bias, secondary is the "canary in the coal mine"
-        # - Primary strongly supports + Secondary supports → HOLD (full conviction)
-        # - Primary supports + Secondary turning → PARTIAL EXIT (early warning)
-        # - Primary weakening → EXIT (don't wait for full break)
-        # ═══════════════════════════════════════════════════════════
-        
-        if primary_strongly_supports and secondary_supports:
-            # Best case: Primary + Secondary both support - full conviction
-            thesis_quality = 0.95 if ml_supports else 0.8
-            logger.info(f"   🎯 {setup_type}: {tf_labels[0]} + {tf_labels[1]} ALIGNED - FULL CONVICTION")
-            logger.info(f"      {tf_labels[0]}={tf_values[0]:.2f} ✓✓, {tf_labels[1]}={tf_values[1]:.2f} ✓, {tf_labels[2]}={tf_values[2]:.2f}")
-        elif primary_strongly_supports and not secondary_supports:
-            # Primary strong but Secondary turning - EARLY WARNING
-            if is_profitable:
-                thesis_quality = 0.6  # Reduce conviction
-                logger.info(f"   ⚠️ {setup_type}: {tf_labels[1]} EARLY WARNING - {tf_labels[0]} strong but {tf_labels[1]} turning")
-            else:
-                thesis_quality = 0.75  # Still hold if not profitable yet
-                logger.info(f"   📊 {setup_type}: {tf_labels[0]} strong, {tf_labels[1]} turning - HOLD (not profitable yet)")
-            logger.info(f"      {tf_labels[0]}={tf_values[0]:.2f} ✓✓, {tf_labels[1]}={tf_values[1]:.2f} ⚠️, {tf_labels[2]}={tf_values[2]:.2f}")
-        elif primary_supports and secondary_supports:
-            # Primary supports (not strongly) + Secondary confirms
-            thesis_quality = 0.7 if ml_supports else 0.55
-            logger.info(f"   📊 {setup_type}: {tf_labels[0]} + {tf_labels[1]} SUPPORT - HOLD")
-            logger.info(f"      {tf_labels[0]}={tf_values[0]:.2f} ✓, {tf_labels[1]}={tf_values[1]:.2f} ✓, {tf_labels[2]}={tf_values[2]:.2f}")
-        elif primary_supports and not secondary_supports:
-            # Primary supports but Secondary against - STRONG WARNING
-            if is_profitable:
-                thesis_quality = 0.4  # Take profits
-                logger.info(f"   🚨 {setup_type}: {tf_labels[1]} DIVERGING - {tf_labels[0]} ok but {tf_labels[1]} against")
-            else:
-                thesis_quality = 0.5  # Caution but hold
-                logger.info(f"   ⚠️ {setup_type}: {tf_labels[0]} ok but {tf_labels[1]} against - CAUTION")
-            logger.info(f"      {tf_labels[0]}={tf_values[0]:.2f} ✓, {tf_labels[1]}={tf_values[1]:.2f} ✗, {tf_labels[2]}={tf_values[2]:.2f}")
-        else:
-            # Primary NO LONGER SUPPORTS
-            if secondary_supports and tertiary_supports:
-                thesis_quality = 0.3
-                logger.info(f"   ⚠️ {setup_type}: {tf_labels[0]} BROKE but {tf_labels[1]}/{tf_labels[2]} still support - WATCH")
-            elif secondary_supports or tertiary_supports:
-                thesis_quality = 0.2
-                logger.info(f"   ❌ {setup_type}: {tf_labels[0]} BROKE, only 1 TF supports - EXIT SOON")
-            else:
-                thesis_quality = 0.1
-                logger.info(f"   ❌ {setup_type}: ALL TIMEFRAMES AGAINST - EXIT")
-            logger.info(f"      {tf_labels[0]}={tf_values[0]:.2f} ✗, {tf_labels[1]}={tf_values[1]:.2f}, {tf_labels[2]}={tf_values[2]:.2f}")
+        logger.info(f"   🧠 AI Thesis Quality: {thesis_quality:.2f} (ML supports: {ml_supports})")
+        logger.info(f"      HTF: H1={h1_trend:.2f}, H4={h4_trend:.2f}, D1={d1_trend:.2f}")
+        logger.info(f"      Position: {'BUY' if is_buy else 'SELL'} | Profitable: {is_profitable}")
         
         # Apply thesis quality to potential gain
         # HEDGE FUND APPROACH: Let the market structure determine potential, not arbitrary caps

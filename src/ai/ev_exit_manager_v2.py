@@ -2889,7 +2889,7 @@ class EVExitManagerV2:
         min_potential = 0.3 * thesis_quality  # At least 0.3% for valid thesis
         potential_account_gain = max(potential_account_gain, min_potential)
         
-        logger.info(f"   📊 Thesis quality: {thesis_quality:.1f} (HTF={htf_support_count}/3, ML={ml_direction})")
+        logger.info(f"   📊 Thesis quality: {thesis_quality:.2f} (AI-driven continuous scoring)")
         logger.info(f"   📊 AI-driven potential gain: {potential_account_gain:.4f}% (from market structure, no hardcoded caps)")
         
         # ═══════════════════════════════════════════════════════════

@@ -105,6 +105,13 @@ class UnifiedTradingSystem:
         # ═══════════════════════════════════════════════════════════
         self.position_state = {}  # symbol -> {setup_type, entry_time, entry_price, last_action, ...}
         self.recent_closes = {}   # symbol -> {time, direction, cont_prob, reason}
+        
+        # ═══════════════════════════════════════════════════════════
+        # LOSS COOLDOWN TRACKING - Prevents rapid re-entry after losses
+        # This is CRITICAL for preventing the US500-style disaster where
+        # the system re-entered 11 times in 30 minutes, losing each time
+        # ═══════════════════════════════════════════════════════════
+        self.recent_losses = {}   # symbol -> {count, last_loss_time, total_loss, direction}
     
     def get_session_context(self, symbol: str) -> Dict:
         """
@@ -318,7 +325,7 @@ class UnifiedTradingSystem:
             if price > 0:
                 self.position_state[symbol_key]['last_action_price'] = price
     
-    def register_close(self, symbol: str, direction: str, cont_prob: float, reason: str):
+    def register_close(self, symbol: str, direction: str, cont_prob: float, reason: str, pnl: float = 0):
         """Register a position close for anti-churn tracking."""
         symbol_key = symbol.lower().split('.')[0]
         self.recent_closes[symbol_key] = {
@@ -331,6 +338,105 @@ class UnifiedTradingSystem:
         if symbol_key in self.position_state:
             del self.position_state[symbol_key]
         logger.info(f"   📝 Registered close for {symbol_key} (cont_prob={cont_prob:.1%})")
+        
+        # Track losses for cooldown
+        if pnl < 0:
+            self._register_loss(symbol_key, direction, pnl)
+        elif pnl > 0:
+            # Win resets the loss counter
+            self._clear_losses(symbol_key)
+    
+    def _register_loss(self, symbol_key: str, direction: str, pnl: float):
+        """Track consecutive losses for a symbol."""
+        now = time.time()
+        
+        if symbol_key in self.recent_losses:
+            loss_info = self.recent_losses[symbol_key]
+            # If same direction and within 2 hours, increment counter
+            if loss_info['direction'] == direction and (now - loss_info['last_loss_time']) < 7200:
+                loss_info['count'] += 1
+                loss_info['total_loss'] += abs(pnl)
+                loss_info['last_loss_time'] = now
+            else:
+                # Different direction or too long ago - reset
+                self.recent_losses[symbol_key] = {
+                    'count': 1,
+                    'last_loss_time': now,
+                    'total_loss': abs(pnl),
+                    'direction': direction
+                }
+        else:
+            self.recent_losses[symbol_key] = {
+                'count': 1,
+                'last_loss_time': now,
+                'total_loss': abs(pnl),
+                'direction': direction
+            }
+        
+        loss_info = self.recent_losses[symbol_key]
+        logger.warning(f"   ⚠️ LOSS #{loss_info['count']} for {symbol_key} ({direction}): ${abs(pnl):.2f} (total: ${loss_info['total_loss']:.2f})")
+    
+    def _clear_losses(self, symbol_key: str):
+        """Clear loss counter after a win."""
+        if symbol_key in self.recent_losses:
+            logger.info(f"   ✅ Win clears loss counter for {symbol_key}")
+            del self.recent_losses[symbol_key]
+    
+    def check_loss_cooldown(self, symbol: str, direction: str) -> tuple:
+        """
+        Check if we should block entry due to recent consecutive losses.
+        
+        Returns: (allowed: bool, reason: str)
+        
+        Logic:
+        - 1 loss: No cooldown (normal trading)
+        - 2 losses: 5 min cooldown OR direction change
+        - 3+ losses: 15 min cooldown AND direction change required
+        - 5+ losses: 60 min cooldown (circuit breaker level)
+        """
+        symbol_key = symbol.lower().split('.')[0]
+        
+        if symbol_key not in self.recent_losses:
+            return True, "No recent losses"
+        
+        loss_info = self.recent_losses[symbol_key]
+        loss_count = loss_info['count']
+        last_loss_time = loss_info['last_loss_time']
+        loss_direction = loss_info['direction']
+        total_loss = loss_info['total_loss']
+        
+        seconds_since_loss = time.time() - last_loss_time
+        direction_changed = direction != loss_direction
+        
+        # 1 loss: Allow immediately
+        if loss_count == 1:
+            return True, "Single loss - normal trading"
+        
+        # 2 losses: 5 min cooldown OR direction change
+        if loss_count == 2:
+            if direction_changed:
+                logger.info(f"   🔄 Direction changed after 2 losses - allowing entry")
+                return True, "Direction changed after 2 losses"
+            if seconds_since_loss >= 300:  # 5 minutes
+                return True, f"5 min cooldown passed after 2 losses"
+            return False, f"Loss cooldown: 2 losses in {loss_direction}, wait {300 - seconds_since_loss:.0f}s or change direction"
+        
+        # 3-4 losses: 15 min cooldown AND direction change preferred
+        if loss_count <= 4:
+            if direction_changed and seconds_since_loss >= 300:
+                logger.info(f"   🔄 Direction changed + 5min after {loss_count} losses - allowing entry")
+                return True, f"Direction changed + cooldown after {loss_count} losses"
+            if seconds_since_loss >= 900:  # 15 minutes
+                return True, f"15 min cooldown passed after {loss_count} losses"
+            return False, f"Loss cooldown: {loss_count} losses (${total_loss:.0f}), wait {900 - seconds_since_loss:.0f}s"
+        
+        # 5+ losses: 60 min cooldown (circuit breaker)
+        if seconds_since_loss >= 3600:  # 60 minutes
+            logger.warning(f"   ⚠️ 60 min cooldown passed after {loss_count} losses - resetting")
+            del self.recent_losses[symbol_key]
+            return True, f"60 min circuit breaker cooldown passed"
+        
+        return False, f"CIRCUIT BREAKER: {loss_count} consecutive losses (${total_loss:.0f}), wait {(3600 - seconds_since_loss)/60:.0f} min"
     
     def check_anti_churn_entry(self, symbol: str, current_cont_prob: float, 
                                 current_direction: str) -> tuple:
@@ -663,7 +769,20 @@ class UnifiedTradingSystem:
             ml_htf_alignment = 0.7  # ML uncertain - slightly reduce confidence
         
         # ═══════════════════════════════════════════════════════════
-        # STEP 2: ANTI-CHURN CHECK (before any other analysis)
+        # STEP 2A: LOSS COOLDOWN CHECK (CRITICAL - prevents US500-style disasters)
+        # If we've had consecutive losses on this symbol, require cooldown
+        # ═══════════════════════════════════════════════════════════
+        
+        loss_cooldown_ok, loss_cooldown_reason = self.check_loss_cooldown(
+            context.symbol, direction
+        )
+        
+        if not loss_cooldown_ok:
+            logger.warning(f"   🚫 {loss_cooldown_reason}")
+            return {'should_enter': False, 'reason': loss_cooldown_reason}
+        
+        # ═══════════════════════════════════════════════════════════
+        # STEP 2B: ANTI-CHURN CHECK (thesis change required after close)
         # AI-driven: requires thesis change, not just time
         # ═══════════════════════════════════════════════════════════
         

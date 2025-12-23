@@ -1104,6 +1104,30 @@ class EVExitManagerV2:
         
         MIN_EXIT_ADVANTAGE = 0.15  # 0.15% minimum advantage over HOLD for ANY exit
         
+        # ═══════════════════════════════════════════════════════════
+        # MINIMUM POSITION AGE CHECK - CRITICAL FIX
+        # 
+        # Prevents immediate exit on brand new positions. This fixes the
+        # US500 disaster where positions were opened and immediately closed
+        # because thesis_quality was 0.1 (position direction mismatched AI signal).
+        # 
+        # New positions need time to develop. Even if thesis looks weak,
+        # give the position at least 5 minutes before considering exit.
+        # This prevents:
+        # 1. Churning from open-close-open-close cycles
+        # 2. Losses from spread/commission on immediate exits
+        # 3. False thesis readings on brand new positions
+        # ═══════════════════════════════════════════════════════════
+        
+        position_age_minutes = getattr(context, 'position_age_minutes', 0)
+        MIN_POSITION_AGE_MINUTES = 5  # Minimum 5 minutes before any exit
+        
+        if position_age_minutes < MIN_POSITION_AGE_MINUTES and best_action in ['CLOSE', 'SCALE_OUT_25', 'SCALE_OUT_50']:
+            logger.warning(f"   ⏳ POSITION TOO NEW ({position_age_minutes:.0f} min < {MIN_POSITION_AGE_MINUTES} min) - forcing HOLD")
+            logger.info(f"      New positions need time to develop. Blocking {best_action}.")
+            best_action = 'HOLD'
+            best_ev = hold_ev
+        
         if best_action in ['CLOSE', 'SCALE_OUT_25', 'SCALE_OUT_50']:
             ev_advantage = best_ev - hold_ev
             

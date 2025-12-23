@@ -613,6 +613,63 @@ class UnifiedTradingSystem:
             else:
                 return trend < 0.45
         
+        # ═══════════════════════════════════════════════════════════
+        # AI-DRIVEN TREND DETECTION
+        # 
+        # HEDGE FUND PRINCIPLE: Don't fight strong trends.
+        # When D1/H4 show a STRONG trend, trade WITH it, not against.
+        # Use ML to TIME entries within the trend, not to fight it.
+        # 
+        # This is why Gold works so well:
+        #   - D1 strongly bullish (0.97)
+        #   - ML says BUY (aligned with trend)
+        #   - Easy entries, all winners
+        # 
+        # Indices problem:
+        #   - D1 bullish (0.61)
+        #   - ML says SELL (counter-trend)
+        #   - System correctly rejects, but misses opportunities
+        # 
+        # SOLUTION: When strong HTF trend exists, OVERRIDE ML direction
+        # to align with trend. This catches pullback completions.
+        # ═══════════════════════════════════════════════════════════
+        
+        # Detect STRONG HTF trend (continuous scoring, not binary)
+        # D1 > 0.60 = strong bullish, D1 < 0.40 = strong bearish
+        d1_trend_strength = abs(d1_trend - 0.5) * 2  # 0 to 1 scale
+        h4_trend_strength = abs(h4_trend - 0.5) * 2  # 0 to 1 scale
+        
+        # Combined HTF trend strength (D1 weighted more)
+        htf_trend_strength = d1_trend_strength * 0.6 + h4_trend_strength * 0.4
+        
+        # Determine HTF trend direction
+        htf_bullish = d1_trend > 0.55 and h4_trend > 0.50
+        htf_bearish = d1_trend < 0.45 and h4_trend < 0.50
+        
+        # AI-driven direction override when strong HTF trend exists
+        trend_override_applied = False
+        original_ml_direction = ml_direction
+        
+        # Debug logging
+        logger.info(f"   📊 HTF Trend Analysis: strength={htf_trend_strength:.2f}, bullish={htf_bullish}, bearish={htf_bearish}, ML={ml_direction}")
+        
+        if htf_trend_strength > 0.15:  # Strong trend exists (lowered threshold for better detection)
+            if htf_bullish and ml_direction == 'SELL':
+                # Strong bullish trend but ML says SELL
+                # HEDGE FUND APPROACH: Wait for pullback to complete, then BUY with trend
+                # Override to BUY - this catches the pullback completion
+                logger.info(f"   📈 STRONG HTF BULLISH (D1={d1_trend:.2f}, H4={h4_trend:.2f})")
+                logger.info(f"      ML says SELL but trend is UP - overriding to BUY with trend")
+                ml_direction = 'BUY'  # Override ML to align with trend
+                trend_override_applied = True
+            elif htf_bearish and ml_direction == 'BUY':
+                # Strong bearish trend but ML says BUY
+                # Override to SELL - trade with the trend
+                logger.info(f"   📉 STRONG HTF BEARISH (D1={d1_trend:.2f}, H4={h4_trend:.2f})")
+                logger.info(f"      ML says BUY but trend is DOWN - overriding to SELL with trend")
+                ml_direction = 'SELL'  # Override ML to align with trend
+                trend_override_applied = True
+        
         # Check ML direction to determine which way we're looking
         check_buy = ml_direction == 'BUY' or (ml_direction == 'HOLD' and ml_confidence > 0.52)
         
@@ -626,7 +683,13 @@ class UnifiedTradingSystem:
         htf_support_count = sum([d1_supports, h4_supports, h1_supports])
         ltf_support_count = sum([m30_supports, m15_supports])
         
-        if d1_supports and h4_supports:
+        # When trend override is applied, we're trading WITH the trend
+        # This should be classified as SWING or DAY, not SCALP
+        if trend_override_applied and htf_support_count >= 2:
+            # Trading with strong HTF trend = SWING setup
+            preliminary_setup = 'SWING'
+            logger.info(f"      → SWING setup (trading with HTF trend)")
+        elif d1_supports and h4_supports:
             preliminary_setup = 'SWING'
         elif h4_supports and h1_supports:
             preliminary_setup = 'DAY'
@@ -670,7 +733,10 @@ class UnifiedTradingSystem:
         # Log the AI-driven direction selection
         logger.info(f"   🧠 AI Direction Analysis ({preliminary_setup} weights):")
         logger.info(f"      BUY score: {buy_score:.3f} | SELL score: {sell_score:.3f}")
-        logger.info(f"      Selected: {direction} (confidence: {direction_confidence:.1%})")
+        if trend_override_applied:
+            logger.info(f"      Selected: {direction} (confidence: {direction_confidence:.1%}) [TREND OVERRIDE from {original_ml_direction}]")
+        else:
+            logger.info(f"      Selected: {direction} (confidence: {direction_confidence:.1%})")
         logger.info(f"      TFs: D1={d1_trend:.2f}, H4={h4_trend:.2f}, H1={h1_trend:.2f}, M30={m30_trend:.2f}, M15={m15_trend:.2f}")
         
         # ═══════════════════════════════════════════════════════════

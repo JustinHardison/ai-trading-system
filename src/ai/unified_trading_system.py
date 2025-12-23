@@ -646,29 +646,8 @@ class UnifiedTradingSystem:
         htf_bullish = d1_trend > 0.55 and h4_trend > 0.50
         htf_bearish = d1_trend < 0.45 and h4_trend < 0.50
         
-        # AI-driven direction override when strong HTF trend exists
-        trend_override_applied = False
-        original_ml_direction = ml_direction
-        
-        # Debug logging
-        logger.info(f"   📊 HTF Trend Analysis: strength={htf_trend_strength:.2f}, bullish={htf_bullish}, bearish={htf_bearish}, ML={ml_direction}")
-        
-        if htf_trend_strength > 0.15:  # Strong trend exists (lowered threshold for better detection)
-            if htf_bullish and ml_direction == 'SELL':
-                # Strong bullish trend but ML says SELL
-                # HEDGE FUND APPROACH: Wait for pullback to complete, then BUY with trend
-                # Override to BUY - this catches the pullback completion
-                logger.info(f"   📈 STRONG HTF BULLISH (D1={d1_trend:.2f}, H4={h4_trend:.2f})")
-                logger.info(f"      ML says SELL but trend is UP - overriding to BUY with trend")
-                ml_direction = 'BUY'  # Override ML to align with trend
-                trend_override_applied = True
-            elif htf_bearish and ml_direction == 'BUY':
-                # Strong bearish trend but ML says BUY
-                # Override to SELL - trade with the trend
-                logger.info(f"   📉 STRONG HTF BEARISH (D1={d1_trend:.2f}, H4={h4_trend:.2f})")
-                logger.info(f"      ML says BUY but trend is DOWN - overriding to SELL with trend")
-                ml_direction = 'SELL'  # Override ML to align with trend
-                trend_override_applied = True
+        # Log HTF trend analysis (used for alignment bonus later)
+        logger.info(f"   📊 HTF Trend: strength={htf_trend_strength:.2f}, bullish={htf_bullish}, bearish={htf_bearish}, ML={ml_direction}")
         
         # Check ML direction to determine which way we're looking
         check_buy = ml_direction == 'BUY' or (ml_direction == 'HOLD' and ml_confidence > 0.52)
@@ -683,13 +662,7 @@ class UnifiedTradingSystem:
         htf_support_count = sum([d1_supports, h4_supports, h1_supports])
         ltf_support_count = sum([m30_supports, m15_supports])
         
-        # When trend override is applied, we're trading WITH the trend
-        # This should be classified as SWING or DAY, not SCALP
-        if trend_override_applied and htf_support_count >= 2:
-            # Trading with strong HTF trend = SWING setup
-            preliminary_setup = 'SWING'
-            logger.info(f"      → SWING setup (trading with HTF trend)")
-        elif d1_supports and h4_supports:
+        if d1_supports and h4_supports:
             preliminary_setup = 'SWING'
         elif h4_supports and h1_supports:
             preliminary_setup = 'DAY'
@@ -733,10 +706,7 @@ class UnifiedTradingSystem:
         # Log the AI-driven direction selection
         logger.info(f"   🧠 AI Direction Analysis ({preliminary_setup} weights):")
         logger.info(f"      BUY score: {buy_score:.3f} | SELL score: {sell_score:.3f}")
-        if trend_override_applied:
-            logger.info(f"      Selected: {direction} (confidence: {direction_confidence:.1%}) [TREND OVERRIDE from {original_ml_direction}]")
-        else:
-            logger.info(f"      Selected: {direction} (confidence: {direction_confidence:.1%})")
+        logger.info(f"      Selected: {direction} (confidence: {direction_confidence:.1%})")
         logger.info(f"      TFs: D1={d1_trend:.2f}, H4={h4_trend:.2f}, H1={h1_trend:.2f}, M30={m30_trend:.2f}, M15={m15_trend:.2f}")
         
         # ═══════════════════════════════════════════════════════════
@@ -810,11 +780,43 @@ class UnifiedTradingSystem:
         # The reduction scales with ML confidence above 70%.
         # ═══════════════════════════════════════════════════════════
         
+        # ═══════════════════════════════════════════════════════════
+        # AI-DRIVEN ALIGNMENT BONUS
+        # 
+        # When ML agrees with HTF trend, this is HIGH CONVICTION:
+        # - ML analyzed 147 features and says BUY
+        # - D1/H4 trends also say BUY
+        # - This alignment is RARE for indices (only 6% for US30)
+        # - These are the moments we MUST capture
+        # 
+        # Gold naturally has this alignment (83% ML BUY + D1 0.97 bullish)
+        # Indices rarely have it, so when they do, BOOST confidence
+        # ═══════════════════════════════════════════════════════════
+        
+        ml_htf_aligned = False
+        alignment_bonus = 0.0
+        
+        # Check if ML agrees with HTF trend direction
+        if ml_direction == 'BUY' and htf_bullish:
+            ml_htf_aligned = True
+            # Bonus scales with ML confidence and HTF trend strength
+            alignment_bonus = ml_confidence * htf_trend_strength * 0.10  # Up to ~8% boost
+            direction_confidence += alignment_bonus
+            logger.info(f"   🎯 ML+HTF ALIGNED (BUY): +{alignment_bonus:.1%} confidence boost")
+            logger.info(f"      ML={ml_confidence:.0%}, HTF strength={htf_trend_strength:.2f}")
+        elif ml_direction == 'SELL' and htf_bearish:
+            ml_htf_aligned = True
+            alignment_bonus = ml_confidence * htf_trend_strength * 0.10
+            direction_confidence += alignment_bonus
+            logger.info(f"   🎯 ML+HTF ALIGNED (SELL): +{alignment_bonus:.1%} confidence boost")
+            logger.info(f"      ML={ml_confidence:.0%}, HTF strength={htf_trend_strength:.2f}")
+        
         ml_threshold_reduction = 0.0
         if ml_confidence > 0.70 and ml_direction == direction:
             # ML agrees with direction AND is very confident
-            # Reduce threshold proportionally: 70% ML = 0%, 80% ML = 1.5%, 90% ML = 3%
-            ml_threshold_reduction = (ml_confidence - 0.70) * 0.15
+            # Reduce threshold proportionally: 70% ML = 0%, 80% ML = 2.5%, 90% ML = 5%
+            # INCREASED from 0.15 to 0.25 to better capture high-conviction moments
+            ml_threshold_reduction = (ml_confidence - 0.70) * 0.25
             min_confidence -= ml_threshold_reduction
             logger.info(f"   🤖 High ML confidence ({ml_confidence:.0%}) agrees with {direction}")
             logger.info(f"      Threshold reduced by {ml_threshold_reduction:.1%} → {min_confidence:.0%}")

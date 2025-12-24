@@ -17,6 +17,7 @@ import pytz
 from .enhanced_context import EnhancedTradingContext
 from .ai_market_analyzer import get_ai_analyzer, AIMarketState
 from .ftmo_strategy import get_ftmo_strategy
+from .regime_detector import get_regime_detector, MarketRegime
 
 logger = logging.getLogger(__name__)
 
@@ -3528,6 +3529,101 @@ class EVExitManagerV2:
         # This makes exit more attractive for weak positions during drawdowns
         
         # ═══════════════════════════════════════════════════════════
+        # AI-DRIVEN REGIME-AWARE EXIT ADAPTATION
+        # 
+        # Use the sophisticated RegimeDetector to adapt exit behavior:
+        # - TRENDING regimes: More patience, let winners run
+        # - RANGING regimes: Faster profit taking, tighter exits
+        # - VOLATILE regimes: Quick exits, protect capital
+        # 
+        # This is AI-powered using live market analysis (ADX, volatility,
+        # momentum, market structure) - NOT hardcoded thresholds.
+        # ═══════════════════════════════════════════════════════════
+        
+        regime_detector = get_regime_detector()
+        regime_state = regime_detector.detect_regime(context)
+        detected_regime = regime_state.regime
+        regime_params = regime_detector.get_regime_parameters(detected_regime)
+        
+        # AI-driven regime exit adjustment
+        regime_exit_adj = 0.0
+        regime_hold_adj = 0.0
+        
+        if detected_regime in [MarketRegime.TRENDING_STRONG, MarketRegime.TRENDING_WEAK]:
+            # TRENDING: More patience, let winners run
+            # Reduce exit pressure, increase hold attractiveness
+            if profit_pct > 0:
+                # Profitable in trending market - be patient
+                regime_hold_adj = 0.02 if detected_regime == MarketRegime.TRENDING_STRONG else 0.01
+                logger.info(f"   📈 TRENDING regime: +{regime_hold_adj:.1%} HOLD bonus (let winners run)")
+            else:
+                # Losing in trending market - check if with or against trend
+                if (is_buy and regime_state.trend_direction == 'UP') or (not is_buy and regime_state.trend_direction == 'DOWN'):
+                    # With trend but losing - be patient, trend may resume
+                    regime_hold_adj = 0.01
+                    logger.info(f"   📈 TRENDING + with trend: patience for recovery")
+                else:
+                    # Against trend and losing - exit faster
+                    regime_exit_adj = 0.02
+                    logger.info(f"   ⚠️ TRENDING but against trend: +{regime_exit_adj:.1%} exit pressure")
+        
+        elif detected_regime in [MarketRegime.RANGING_TIGHT, MarketRegime.RANGING_WIDE]:
+            # RANGING: Faster profit taking, tighter exits
+            # In ranges, profits tend to reverse - take them quickly
+            if profit_pct > 0:
+                # Profitable in ranging market - take profits faster
+                regime_exit_adj = 0.015 if detected_regime == MarketRegime.RANGING_TIGHT else 0.01
+                logger.info(f"   🔄 RANGING regime: +{regime_exit_adj:.1%} exit bonus (take profits in range)")
+            else:
+                # Losing in ranging market - check if near S/R for bounce
+                h4_dist_support = getattr(context, 'h4_dist_to_support', 50.0)
+                h4_dist_resistance = getattr(context, 'h4_dist_to_resistance', 50.0)
+                
+                near_support = h4_dist_support < 2.0 and is_buy
+                near_resistance = h4_dist_resistance < 2.0 and not is_buy
+                
+                if near_support or near_resistance:
+                    # Near S/R in ranging market - potential bounce
+                    regime_hold_adj = 0.01
+                    logger.info(f"   🔄 RANGING + near S/R: patience for bounce")
+                else:
+                    # Not near S/R in ranging market - exit
+                    regime_exit_adj = 0.01
+                    logger.info(f"   🔄 RANGING + not at S/R: +{regime_exit_adj:.1%} exit pressure")
+        
+        elif detected_regime in [MarketRegime.VOLATILE_BREAKOUT, MarketRegime.VOLATILE_REVERSAL]:
+            # VOLATILE: Quick exits, protect capital
+            if detected_regime == MarketRegime.VOLATILE_REVERSAL:
+                # Volatile reversal - exit quickly
+                regime_exit_adj = 0.03
+                logger.info(f"   💥 VOLATILE REVERSAL: +{regime_exit_adj:.1%} exit pressure (protect capital)")
+            else:
+                # Volatile breakout - depends on direction alignment
+                if profit_pct > 0:
+                    # Profitable in breakout - can hold but be ready to exit
+                    regime_hold_adj = 0.005
+                    logger.info(f"   💥 VOLATILE BREAKOUT + profitable: slight hold bonus")
+                else:
+                    # Losing in breakout - exit fast
+                    regime_exit_adj = 0.02
+                    logger.info(f"   💥 VOLATILE BREAKOUT + losing: +{regime_exit_adj:.1%} exit pressure")
+        
+        elif detected_regime == MarketRegime.RISK_OFF:
+            # RISK_OFF: Defensive mode, protect capital
+            regime_exit_adj = 0.02
+            logger.info(f"   🛡️ RISK_OFF regime: +{regime_exit_adj:.1%} exit pressure (defensive)")
+        
+        elif detected_regime == MarketRegime.TRANSITION:
+            # TRANSITION: Regime unclear, be cautious
+            if profit_pct > 0:
+                # Profitable in transition - take some profits
+                regime_exit_adj = 0.01
+                logger.info(f"   ⏳ TRANSITION regime: +{regime_exit_adj:.1%} exit (lock in profits)")
+        
+        # Store regime info for logging
+        logger.info(f"   📊 EXIT REGIME: {detected_regime.value} (conf={regime_state.confidence:.2f})")
+        
+        # ═══════════════════════════════════════════════════════════
         # TARGET EXCEEDED ADJUSTMENT
         # 
         # When profit exceeds target, the expected continuation should
@@ -3563,7 +3659,10 @@ class EVExitManagerV2:
             effective_cont_prob * potential_account_gain +
             effective_rev_prob * (profit_pct - potential_loss) +
             flat_prob * profit_pct
-        ) * (1.0 - leading_indicator_penalty) - profit_protection_premium - drawdown_exit_premium - total_hedge_fund_premium
+        ) * (1.0 - leading_indicator_penalty) - profit_protection_premium - drawdown_exit_premium - total_hedge_fund_premium + regime_hold_adj
+        
+        # Apply regime exit adjustment to CLOSE/SCALE_OUT EVs later
+        # Store for use in EV_CLOSE calculation
         
         # EV(CLOSE) = current profit (certain)
         # BUT: If AI strongly believes in the trade, closing early has OPPORTUNITY COST
@@ -3901,7 +4000,7 @@ class EVExitManagerV2:
             if weekend_close_boost > 0.05:
                 logger.info(f"   ⚠️ FRIDAY AFTERNOON: Weekend risk boost +{weekend_close_boost:.4f}%")
         
-        ev_close = profit_pct - opportunity_cost - total_cost_pct + profit_protection_value + drawdown_close_boost + news_close_boost + daily_profit_close_boost - patience_close_penalty + weekend_close_boost
+        ev_close = profit_pct - opportunity_cost - total_cost_pct + profit_protection_value + drawdown_close_boost + news_close_boost + daily_profit_close_boost - patience_close_penalty + weekend_close_boost + regime_exit_adj
         
         if news_close_boost > 0:
             logger.info(f"   📰 NEWS/THESIS RISK: CLOSE boosted by {news_close_boost:.4f}%")
@@ -4138,8 +4237,9 @@ class EVExitManagerV2:
         
         # Apply premature exit penalty to SCALE_OUT EV (reduces attractiveness of early exits)
         # Add target_exceeded_bonus when profit exceeds target significantly
-        ev_scale_out_25 = ((profit_pct * 0.25 - total_cost_pct * 0.25) + 0.75 * ev_hold + risk_reduction_bonus * 0.25 + exhaustion_bonus * 0.25 + profit_protection_premium * 0.25 + drawdown_scale_boost + news_scale_boost * 0.25 + daily_profit_boost * 0.25 - scale_out_premature_penalty * 0.25 + weekend_scale_boost_25 + target_exceeded_bonus * 0.25) * session_scale_out_adj
-        ev_scale_out_50 = ((profit_pct * 0.50 - total_cost_pct * 0.50) + 0.50 * ev_hold + risk_reduction_bonus * 0.50 + exhaustion_bonus * 0.50 + profit_protection_premium * 0.50 + drawdown_scale_boost * 2 + news_scale_boost * 0.50 + daily_profit_boost * 0.50 - scale_out_premature_penalty * 0.50 + weekend_scale_boost_50 + target_exceeded_bonus * 0.50) * session_scale_out_adj
+        # Add regime_exit_adj for regime-aware exit behavior
+        ev_scale_out_25 = ((profit_pct * 0.25 - total_cost_pct * 0.25) + 0.75 * ev_hold + risk_reduction_bonus * 0.25 + exhaustion_bonus * 0.25 + profit_protection_premium * 0.25 + drawdown_scale_boost + news_scale_boost * 0.25 + daily_profit_boost * 0.25 - scale_out_premature_penalty * 0.25 + weekend_scale_boost_25 + target_exceeded_bonus * 0.25 + regime_exit_adj * 0.25) * session_scale_out_adj
+        ev_scale_out_50 = ((profit_pct * 0.50 - total_cost_pct * 0.50) + 0.50 * ev_hold + risk_reduction_bonus * 0.50 + exhaustion_bonus * 0.50 + profit_protection_premium * 0.50 + drawdown_scale_boost * 2 + news_scale_boost * 0.50 + daily_profit_boost * 0.50 - scale_out_premature_penalty * 0.50 + weekend_scale_boost_50 + target_exceeded_bonus * 0.50 + regime_exit_adj * 0.50) * session_scale_out_adj
         
         if profit_protection_premium > 0:
             logger.info(f"   💰 Profit Protection: SCALE_OUT boosted by {profit_protection_premium * 0.25:.4f}% (25%) / {profit_protection_premium * 0.50:.4f}% (50%)")

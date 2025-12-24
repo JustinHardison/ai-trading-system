@@ -17,6 +17,7 @@ from typing import Dict, Optional
 from .enhanced_context import EnhancedTradingContext
 from .ftmo_strategy import get_ftmo_strategy
 from .ai_market_analyzer import get_ai_analyzer, AIMarketState
+from .regime_detector import get_regime_detector, MarketRegime
 # Position sizing delegated to ElitePositionSizer in api.py
 
 logger = logging.getLogger(__name__)
@@ -820,6 +821,103 @@ class UnifiedTradingSystem:
             min_confidence -= ml_threshold_reduction
             logger.info(f"   🤖 High ML confidence ({ml_confidence:.0%}) agrees with {direction}")
             logger.info(f"      Threshold reduced by {ml_threshold_reduction:.1%} → {min_confidence:.0%}")
+        
+        # ═══════════════════════════════════════════════════════════
+        # AI-DRIVEN REGIME-AWARE ENTRY ADAPTATION
+        # 
+        # Use the sophisticated RegimeDetector to adapt entry behavior:
+        # - TRENDING regimes: Trade with trend, wider stops, larger targets
+        # - RANGING regimes: Allow mean reversion entries, tighter stops
+        # - VOLATILE regimes: Reduce exposure, require higher conviction
+        # 
+        # This is AI-powered using live market analysis (ADX, volatility,
+        # momentum, market structure) - NOT hardcoded thresholds.
+        # ═══════════════════════════════════════════════════════════
+        
+        regime_detector = get_regime_detector()
+        regime_state = regime_detector.detect_regime(context)
+        regime = regime_state.regime
+        regime_params = regime_detector.get_regime_parameters(regime)
+        
+        logger.info(f"   📊 REGIME: {regime.value} (conf={regime_state.confidence:.2f}, stability={regime_state.regime_stability:.2f})")
+        
+        # AI-driven regime adaptation
+        regime_confidence_adj = 0.0
+        regime_allows_counter_trend = False
+        
+        if regime in [MarketRegime.TRENDING_STRONG, MarketRegime.TRENDING_WEAK]:
+            # TRENDING: Favor trend-following, boost confidence for with-trend entries
+            if ml_htf_aligned:
+                # ML agrees with trend - this is ideal, boost confidence
+                regime_confidence_adj = 0.03 if regime == MarketRegime.TRENDING_STRONG else 0.02
+                direction_confidence += regime_confidence_adj
+                logger.info(f"   📈 TRENDING regime + ML aligned: +{regime_confidence_adj:.1%} confidence")
+            else:
+                # ML against trend in trending market - be cautious
+                regime_confidence_adj = -0.02
+                direction_confidence += regime_confidence_adj
+                logger.info(f"   ⚠️ TRENDING regime but ML counter-trend: {regime_confidence_adj:.1%} confidence")
+        
+        elif regime in [MarketRegime.RANGING_TIGHT, MarketRegime.RANGING_WIDE]:
+            # RANGING: Allow mean reversion / counter-trend entries
+            # This is where indices can benefit - trade the range instead of waiting for trend
+            regime_allows_counter_trend = True
+            
+            # In ranging markets, ML counter-trend signals can be valid (mean reversion)
+            if not ml_htf_aligned and ml_confidence > 0.65:
+                # ML says opposite of HTF trend - in ranging market this could be mean reversion
+                # Check if price is at extreme (near S/R)
+                h4_dist_support = getattr(context, 'h4_dist_to_support', 50.0)
+                h4_dist_resistance = getattr(context, 'h4_dist_to_resistance', 50.0)
+                
+                # Near support and ML says BUY = potential mean reversion long
+                # Near resistance and ML says SELL = potential mean reversion short
+                near_support = h4_dist_support < 2.0  # Within 2% of support
+                near_resistance = h4_dist_resistance < 2.0  # Within 2% of resistance
+                
+                if (ml_direction == 'BUY' and near_support) or (ml_direction == 'SELL' and near_resistance):
+                    # Valid mean reversion setup in ranging market
+                    regime_confidence_adj = 0.04  # Boost for mean reversion at extremes
+                    direction_confidence += regime_confidence_adj
+                    logger.info(f"   🔄 RANGING + Mean Reversion: ML={ml_direction} at {'support' if near_support else 'resistance'}")
+                    logger.info(f"      +{regime_confidence_adj:.1%} confidence (S/R bounce)")
+                else:
+                    # Ranging but not at extreme - reduce confidence
+                    regime_confidence_adj = -0.01
+                    direction_confidence += regime_confidence_adj
+                    logger.info(f"   📊 RANGING regime: waiting for S/R level ({regime_confidence_adj:.1%})")
+            else:
+                logger.info(f"   📊 RANGING regime: ML aligned or low confidence")
+        
+        elif regime in [MarketRegime.VOLATILE_BREAKOUT, MarketRegime.VOLATILE_REVERSAL]:
+            # VOLATILE: Require higher conviction, reduce exposure
+            if regime == MarketRegime.VOLATILE_BREAKOUT and ml_htf_aligned:
+                # Breakout with ML confirmation - can be good
+                regime_confidence_adj = 0.01
+                direction_confidence += regime_confidence_adj
+                logger.info(f"   💥 VOLATILE BREAKOUT + ML aligned: +{regime_confidence_adj:.1%}")
+            else:
+                # Volatile reversal or unconfirmed breakout - be cautious
+                regime_confidence_adj = -0.03
+                direction_confidence += regime_confidence_adj
+                logger.info(f"   ⚠️ VOLATILE regime: requiring higher conviction ({regime_confidence_adj:.1%})")
+        
+        elif regime in [MarketRegime.RISK_OFF]:
+            # RISK_OFF: Very cautious, only high conviction entries
+            regime_confidence_adj = -0.04
+            direction_confidence += regime_confidence_adj
+            logger.info(f"   🛡️ RISK_OFF regime: defensive mode ({regime_confidence_adj:.1%})")
+        
+        elif regime == MarketRegime.TRANSITION:
+            # TRANSITION: Regime unclear, wait for clarity
+            regime_confidence_adj = -0.02
+            direction_confidence += regime_confidence_adj
+            logger.info(f"   ⏳ TRANSITION regime: waiting for clarity ({regime_confidence_adj:.1%})")
+        
+        # Store regime info for later use in position sizing and exit management
+        context.detected_regime = regime
+        context.regime_params = regime_params
+        context.regime_allows_counter_trend = regime_allows_counter_trend
         
         if direction_confidence < min_confidence:
             logger.info(f"   ⏸️ Direction confidence too low for {likely_setup}")

@@ -500,7 +500,7 @@ async def load_ai_system():
         news_filter = None
 
     logger.info("═══════════════════════════════════════════════════════════════════")
-    logger.info("SYSTEM READY")
+    logger.info("SYSTEM READY - Regime-Aware AI Trading System")
     logger.info("═══════════════════════════════════════════════════════════════════")
 
 
@@ -1770,7 +1770,7 @@ async def ai_trade_decision(request: dict):
                 trigger_tf = request.get('trigger_timeframe', 'M5').upper()
                 logger.info(f"🎯 Entry analysis on {trigger_tf} trigger (HTF alignment required)")
                 
-                # Use unified system for entry decision
+                # Use unified system for entry decision (regime-aware AI trading)
                 entry_decision = unified_system.should_enter_trade(context, market_analysis)
                 
                 if not entry_decision['should_enter']:

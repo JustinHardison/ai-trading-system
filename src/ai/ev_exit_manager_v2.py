@@ -203,14 +203,24 @@ class EVExitManagerV2:
         is_friday_close = is_friday and current_hour >= 21  # Last hour before close
         hours_to_close = max(0, 22 - current_hour) if is_friday else 999
         
-        # Weekend risk multiplier - reduces patience and increases exit pressure
-        weekend_risk_mult = 1.0
+        # ═══════════════════════════════════════════════════════════
+        # WEEKEND RISK MULTIPLIER - INFORMATIONAL ONLY
+        # 
+        # Dec 26 2025 disaster: Blanket weekend_risk_mult was reducing
+        # patience across the board, causing 43 SCALE_OUT actions in 2 hours.
+        # 
+        # FIX: weekend_risk_mult is now INFORMATIONAL ONLY.
+        # The actual weekend boost is applied in _calculate_all_evs()
+        # ONLY when the AI's analysis already supports exiting.
+        # 
+        # This ensures weekend risk management AMPLIFIES AI signals,
+        # not OVERRIDES them with artificial patience reduction.
+        # ═══════════════════════════════════════════════════════════
+        weekend_risk_mult = 1.0  # No longer reduces patience - AI decides
         if is_friday_close:
-            weekend_risk_mult = 0.5  # Very aggressive - close weak positions
-            logger.info(f"   ⚠️ FRIDAY CLOSE ({hours_to_close}h to weekend) - Aggressive exit mode")
+            logger.info(f"   📊 FRIDAY CLOSE ({hours_to_close}h to weekend) - AI will decide based on thesis/reversal")
         elif is_friday_afternoon:
-            weekend_risk_mult = 0.7  # Moderately aggressive
-            logger.info(f"   ⚠️ FRIDAY AFTERNOON ({hours_to_close}h to weekend) - Reduced patience")
+            logger.info(f"   📊 FRIDAY AFTERNOON ({hours_to_close}h to weekend) - AI will decide based on thesis/reversal")
         
         # Determine session
         if 13 <= current_hour < 16:
@@ -1104,64 +1114,6 @@ class EVExitManagerV2:
         # ═══════════════════════════════════════════════════════════
         
         MIN_EXIT_ADVANTAGE = 0.15  # 0.15% minimum advantage over HOLD for ANY exit
-        
-        # ═══════════════════════════════════════════════════════════
-        # ANTI-CHURN PROTECTION: MINIMUM POSITION AGE FOR SCALE_OUT
-        # 
-        # Dec 26 2025 disaster: 43 SCALE_OUT actions in 2 hours on
-        # near-breakeven positions. Positions were being scaled out
-        # within 2-6 minutes of entry - way too fast for swing trading.
-        # 
-        # For SCALE_OUT specifically, require minimum 30 minutes age
-        # unless position is significantly profitable (>0.3%) or
-        # thesis is broken (quality < 0.3).
-        # 
-        # CLOSE is not restricted - if AI says close, close.
-        # ═══════════════════════════════════════════════════════════
-        position_age_minutes = profit_metrics.get('position_age_minutes', 0)
-        current_profit_pct = probabilities.get('current_profit_pct', 0)
-        thesis_quality_check = probabilities.get('thesis_quality', 0.5)
-        
-        MIN_SCALE_OUT_AGE_MINUTES = 30  # Minimum 30 minutes before SCALE_OUT
-        MIN_SCALE_OUT_PROFIT_PCT = 0.05  # Minimum 0.05% profit to SCALE_OUT (covers spread/commission)
-        
-        if best_action in ['SCALE_OUT_25', 'SCALE_OUT_50']:
-            # ═══════════════════════════════════════════════════════════
-            # ANTI-CHURN CHECK 1: Minimum position age
-            # ═══════════════════════════════════════════════════════════
-            # Allow early SCALE_OUT only if:
-            # 1. Position is significantly profitable (>0.3%)
-            # 2. Thesis is broken (quality < 0.3)
-            # 3. Position is old enough (>30 min)
-            allow_early_scale_out = (
-                current_profit_pct > 0.3 or  # Significant profit
-                thesis_quality_check < 0.3 or  # Broken thesis
-                position_age_minutes >= MIN_SCALE_OUT_AGE_MINUTES  # Old enough
-            )
-            
-            if not allow_early_scale_out:
-                logger.info(f"   ⏳ ANTI-CHURN: {best_action} blocked - position too young ({position_age_minutes:.0f} min < {MIN_SCALE_OUT_AGE_MINUTES} min)")
-                logger.info(f"      Profit: {current_profit_pct:.3f}% (need >0.3%), Thesis: {thesis_quality_check:.2f} (need <0.3)")
-                logger.info(f"      Let position develop before scaling out")
-                best_action = 'HOLD'
-                best_ev = hold_ev
-            
-            # ═══════════════════════════════════════════════════════════
-            # ANTI-CHURN CHECK 2: Near-breakeven protection
-            # 
-            # Dec 26 2025 disaster: Positions with -0.005% to 0.002% profit
-            # were being scaled out. This is essentially breakeven - the
-            # spread/commission will eat any "profit" from scaling out.
-            # 
-            # Block SCALE_OUT on near-breakeven positions unless thesis
-            # is broken or position is significantly losing (>0.1% loss).
-            # ═══════════════════════════════════════════════════════════
-            elif abs(current_profit_pct) < MIN_SCALE_OUT_PROFIT_PCT and thesis_quality_check > 0.3:
-                logger.info(f"   ⏳ ANTI-CHURN: {best_action} blocked - near breakeven ({current_profit_pct:.4f}%)")
-                logger.info(f"      Position is essentially flat - spread/commission would eat any gains")
-                logger.info(f"      Let position develop a meaningful profit/loss first")
-                best_action = 'HOLD'
-                best_ev = hold_ev
         
         if best_action in ['CLOSE', 'SCALE_OUT_25', 'SCALE_OUT_50']:
             ev_advantage = best_ev - hold_ev
@@ -4041,22 +3993,52 @@ class EVExitManagerV2:
         # 3. Position profitability (lock in profits before gap risk)
         # ═══════════════════════════════════════════════════════════
         
+        # ═══════════════════════════════════════════════════════════
+        # WEEKEND RISK BOOST - AI-DRIVEN, NOT BLANKET OVERRIDE
+        # 
+        # Dec 26 2025 disaster: Blanket weekend boost caused 43 SCALE_OUT
+        # actions in 2 hours on near-breakeven positions. The boost was
+        # overriding the AI's actual market analysis.
+        # 
+        # FIX: Only apply weekend boost when AI ALREADY supports exiting:
+        # 1. Thesis is genuinely weak (< 0.4) - AI says setup is failing
+        # 2. Reversal probability is high (> 0.4) - AI sees reversal coming
+        # 3. Position is significantly profitable (> 0.3%) - lock in real gains
+        # 
+        # This ensures weekend risk management AMPLIFIES AI signals,
+        # not OVERRIDES them with artificial boosts.
+        # ═══════════════════════════════════════════════════════════
+        
         weekend_close_boost = 0.0
-        if is_friday_close:
-            # Last hour before weekend - aggressive exit for weak positions
+        rev_prob_for_weekend = probabilities.get('reversal', 0.3)
+        
+        # Only apply weekend boost if AI already supports exiting
+        ai_supports_exit = (
+            thesis_quality < 0.4 or  # Weak thesis - AI says setup is failing
+            rev_prob_for_weekend > 0.4 or  # High reversal prob - AI sees reversal
+            profit_pct > 0.3  # Significant profit - worth protecting
+        )
+        
+        if is_friday_close and ai_supports_exit:
+            # Last hour before weekend - amplify AI's exit signal
             # Strong thesis (0.9) = small boost (0.05%), Weak thesis (0.3) = large boost (0.35%)
             weekend_close_boost = 0.4 * (1.0 - thesis_quality)
             # If profitable, add profit protection boost
             if profit_pct > 0:
                 weekend_close_boost += profit_pct * 0.3  # Lock in 30% of profit value
-            logger.warning(f"   ⚠️ FRIDAY CLOSE: Weekend gap risk boost +{weekend_close_boost:.4f}%")
-        elif is_friday_afternoon:
-            # Friday afternoon - moderate exit pressure
+            logger.warning(f"   ⚠️ FRIDAY CLOSE: Weekend gap risk boost +{weekend_close_boost:.4f}% (AI supports exit)")
+        elif is_friday_afternoon and ai_supports_exit:
+            # Friday afternoon - moderate exit pressure, only if AI agrees
             weekend_close_boost = 0.2 * (1.0 - thesis_quality)
             if profit_pct > 0:
                 weekend_close_boost += profit_pct * 0.15  # Lock in 15% of profit value
             if weekend_close_boost > 0.05:
-                logger.info(f"   ⚠️ FRIDAY AFTERNOON: Weekend risk boost +{weekend_close_boost:.4f}%")
+                logger.info(f"   ⚠️ FRIDAY AFTERNOON: Weekend risk boost +{weekend_close_boost:.4f}% (AI supports exit)")
+        elif is_friday_afternoon and not ai_supports_exit:
+            # Friday afternoon but AI doesn't support exit - NO BOOST
+            # Let the AI's actual market analysis decide
+            logger.info(f"   📊 FRIDAY AFTERNOON: No weekend boost (thesis={thesis_quality:.2f}, rev={rev_prob_for_weekend:.1%}, profit={profit_pct:.3f}%)")
+            logger.info(f"      AI doesn't support exit - letting market analysis decide")
         
         ev_close = profit_pct - opportunity_cost - total_cost_pct + profit_protection_value + drawdown_close_boost + news_close_boost + daily_profit_close_boost - patience_close_penalty + weekend_close_boost + regime_exit_adj
         

@@ -1105,6 +1105,64 @@ class EVExitManagerV2:
         
         MIN_EXIT_ADVANTAGE = 0.15  # 0.15% minimum advantage over HOLD for ANY exit
         
+        # ═══════════════════════════════════════════════════════════
+        # ANTI-CHURN PROTECTION: MINIMUM POSITION AGE FOR SCALE_OUT
+        # 
+        # Dec 26 2025 disaster: 43 SCALE_OUT actions in 2 hours on
+        # near-breakeven positions. Positions were being scaled out
+        # within 2-6 minutes of entry - way too fast for swing trading.
+        # 
+        # For SCALE_OUT specifically, require minimum 30 minutes age
+        # unless position is significantly profitable (>0.3%) or
+        # thesis is broken (quality < 0.3).
+        # 
+        # CLOSE is not restricted - if AI says close, close.
+        # ═══════════════════════════════════════════════════════════
+        position_age_minutes = profit_metrics.get('position_age_minutes', 0)
+        current_profit_pct = probabilities.get('current_profit_pct', 0)
+        thesis_quality_check = probabilities.get('thesis_quality', 0.5)
+        
+        MIN_SCALE_OUT_AGE_MINUTES = 30  # Minimum 30 minutes before SCALE_OUT
+        MIN_SCALE_OUT_PROFIT_PCT = 0.05  # Minimum 0.05% profit to SCALE_OUT (covers spread/commission)
+        
+        if best_action in ['SCALE_OUT_25', 'SCALE_OUT_50']:
+            # ═══════════════════════════════════════════════════════════
+            # ANTI-CHURN CHECK 1: Minimum position age
+            # ═══════════════════════════════════════════════════════════
+            # Allow early SCALE_OUT only if:
+            # 1. Position is significantly profitable (>0.3%)
+            # 2. Thesis is broken (quality < 0.3)
+            # 3. Position is old enough (>30 min)
+            allow_early_scale_out = (
+                current_profit_pct > 0.3 or  # Significant profit
+                thesis_quality_check < 0.3 or  # Broken thesis
+                position_age_minutes >= MIN_SCALE_OUT_AGE_MINUTES  # Old enough
+            )
+            
+            if not allow_early_scale_out:
+                logger.info(f"   ⏳ ANTI-CHURN: {best_action} blocked - position too young ({position_age_minutes:.0f} min < {MIN_SCALE_OUT_AGE_MINUTES} min)")
+                logger.info(f"      Profit: {current_profit_pct:.3f}% (need >0.3%), Thesis: {thesis_quality_check:.2f} (need <0.3)")
+                logger.info(f"      Let position develop before scaling out")
+                best_action = 'HOLD'
+                best_ev = hold_ev
+            
+            # ═══════════════════════════════════════════════════════════
+            # ANTI-CHURN CHECK 2: Near-breakeven protection
+            # 
+            # Dec 26 2025 disaster: Positions with -0.005% to 0.002% profit
+            # were being scaled out. This is essentially breakeven - the
+            # spread/commission will eat any "profit" from scaling out.
+            # 
+            # Block SCALE_OUT on near-breakeven positions unless thesis
+            # is broken or position is significantly losing (>0.1% loss).
+            # ═══════════════════════════════════════════════════════════
+            elif abs(current_profit_pct) < MIN_SCALE_OUT_PROFIT_PCT and thesis_quality_check > 0.3:
+                logger.info(f"   ⏳ ANTI-CHURN: {best_action} blocked - near breakeven ({current_profit_pct:.4f}%)")
+                logger.info(f"      Position is essentially flat - spread/commission would eat any gains")
+                logger.info(f"      Let position develop a meaningful profit/loss first")
+                best_action = 'HOLD'
+                best_ev = hold_ev
+        
         if best_action in ['CLOSE', 'SCALE_OUT_25', 'SCALE_OUT_50']:
             ev_advantage = best_ev - hold_ev
             
